@@ -1,0 +1,112 @@
+.ar-camera-container {
+  padding: 2rem;
+}
+
+.ar-header {
+  background: linear-gradient(135deg, rgba(10, 14, 39, 0.8) 0%, rgba(26, 42, 79, 0.8) 100%);
+  padding: 3rem 2rem;
+  margin-bottom: 2rem;
+  border: 2px solid #00d4ff;
+  border-radius: 8px;
+  box-shadow: 
+    0 0 20px rgba(0, 212, 255, 0.4),
+    0 0 40px rgba(0, 212, 255, 0.2),
+    inset 0 0 20px rgba(0, 212, 255, 0.1);
+}
+
+.ar-header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  color: #00ffff;
+  text-shadow: 0 0 20px rgba(0, 255, 255, 0.8), 0 0 40px rgba(0, 212, 255, 0.5);
+}
+
+.ar-header p {
+  font-size: 1.1rem;
+  color: #a8d8ff;
+}
+
+.ar-content {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 2rem;
+}
+
+.camera-view {
+  border: 2px solid #00d4ff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+  min-height: 500px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.placeholder {
+  text-align: center;
+  color: #a8d8ff;
+  font-size: 1.2rem;
+}
+
+.ar-controls {
+  border-left: 4px solid #00d4ff;
+  background: linear-gradient(90deg, 
+    rgba(0, 212, 255, 0.05) 0%, 
+    rgba(10, 14, 39, 0.6) 40%,
+    rgba(10, 14, 39, 0.6) 100%);
+  padding: 2rem;
+  border-radius: 4px;
+  box-shadow: 
+    0 4px 15px rgba(0, 212, 255, 0.15),
+    inset -2px 0 8px rgba(0, 212, 255, 0.08);
+}
+
+.ar-controls h2 {
+  margin-top: 0;
+  color: #00d4ff;
+  font-size: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.control-btn {
+  display: block;
+  width: 100%;
+  padding: 0.8rem 1rem;
+  margin-bottom: 1rem;
+  background: linear-gradient(135deg, #00d4ff 0%, #00a8cc 100%);
+  color: #0a0e27;
+  border: none;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 15px rgba(0, 212, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.control-btn:hover {
+  background: linear-gradient(135deg, #00ffff 0%, #00d4ff 100%);
+  box-shadow: 0 0 25px rgba(0, 212, 255, 0.7), 0 0 40px rgba(0, 255, 255, 0.4);
+  transform: scale(1.02);
+}
+
+.control-btn:active {
+  transform: scale(0.98);
+}
+
+@media (max-width: 768px) {
+  .ar-content {
+    grid-template-columns: 1fr;
+  }
+
+  .ar-controls {
+    border-left: none;
+    border-top: 4px solid #00d4ff;
+  }
+
+  .camera-view {
+    min-height: 300px;
+  }
+}
