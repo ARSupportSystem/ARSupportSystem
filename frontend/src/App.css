@@ -1,0 +1,14 @@
+.App {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0a0e27 0%, #0f1535 100%);
+}
+
+main {
+  flex-grow: 1;
+  padding: 2rem;
+  background: linear-gradient(135deg, #0a0e27 0%, #0f1535 100%);
+  overflow-y: auto;
+  height: calc(100vh - 80px);
+}
