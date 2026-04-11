@@ -1,19 +1,32 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import './ARCamera.css';
 
 const ARCamera = () => {
+  const { pathname } = useLocation();
+
+  const pageContent = pathname === '/tools'
+    ? {
+        title: 'Tools - AR Workspace',
+        subtitle: 'Use AR assistance to inspect and verify tools in your workflow.',
+      }
+    : {
+        title: 'Faults - AR Detection',
+        subtitle: 'Point your device at target areas to detect and visualize faults.',
+      };
+
   return (
     <div className="ar-camera-container">
       <section className="ar-header">
-        <h1>AR Camera - Fault Detection</h1>
-        <p>Point your device at areas to detect and visualize faults</p>
+        <h1>{pageContent.title}</h1>
+        <p>{pageContent.subtitle}</p>
       </section>
       
       <section className="ar-content">
         <div className="camera-view">
           <div className="placeholder">
             <p>AR Camera View</p>
-            <p style={{ fontSize: '0.9rem', marginTop: '1rem', color: '#a8d8ff' }}>
+            <p className="placeholder-subtext">
               Camera feed will appear here
             </p>
           </div>

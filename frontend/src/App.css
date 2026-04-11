@@ -1,14 +1,23 @@
-.App {
+﻿.App {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: linear-gradient(135deg, #0a0e27 0%, #0f1535 100%);
+  background: transparent;
 }
 
 main {
   flex-grow: 1;
-  padding: 2rem;
-  background: linear-gradient(135deg, #0a0e27 0%, #0f1535 100%);
+  width: min(1200px, 100% - 3rem);
+  margin: 72px auto 0;
+  padding: 2rem 0 2.5rem;
+  background: transparent;
   overflow-y: auto;
-  height: calc(100vh - 80px);
+  height: calc(100vh - 72px);
+}
+
+@media (max-width: 768px) {
+  main {
+    width: calc(100% - 2rem);
+    padding-top: 1.25rem;
+  }
 }

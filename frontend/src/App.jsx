@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import Header from './components/Header';
 import HomePage from './components/HomePage';
 import ARCamera from './components/ARCamera';
@@ -13,11 +13,10 @@ function App() {
         <main>
           <Routes>
             <Route path="/" element={<HomePage />} />
-            <Route path="/ar-camera" element={<ARCamera />} />
-            {/* Define other routes here */}
-            {/* <Route path="/faults" element={<Faults />} /> */}
-            {/* <Route path="/tools" element={<Tools />} /> */}
-            {/* <Route path="/monitoring" element={<Monitoring />} /> */}
+            <Route path="/ar-camera" element={<Navigate to="/faults" replace />} />
+            <Route path="/faults" element={<ARCamera />} />
+            <Route path="/tools" element={<ARCamera />} />
+            <Route path="/monitoring" element={<HomePage />} />
           </Routes>
         </main>
       </div>

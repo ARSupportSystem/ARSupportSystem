@@ -1,18 +1,35 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import './Header.css';
 
 const Header = () => {
   return (
     <header className="header">
-      <div className="logo">AR Support System</div>
+      <Link to="/" className="logo-link">
+        <div className="logo">AR Support System</div>
+      </Link>
       <nav>
         <ul>
-          <li><Link to="/">Dashboard</Link></li>
-          <li><Link to="/ar-camera">AR Camera</Link></li>
-          <li><Link to="/faults">Faults</Link></li>
-          <li><Link to="/tools">Tools</Link></li>
-          <li><Link to="/monitoring">System Monitoring</Link></li>
+          <li>
+            <NavLink to="/" end className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+              Dashboard
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/faults" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+              Faults
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/tools" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+              Tools
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/monitoring" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+              Monitoring
+            </NavLink>
+          </li>
         </ul>
       </nav>
     </header>
