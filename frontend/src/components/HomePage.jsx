@@ -5,8 +5,12 @@ import './HomePage.css';
 const HomePage = () => {
   const navigate = useNavigate();
 
-  const handleARCameraClick = () => {
-    navigate('/ar-camera');
+  const handleLaunchFaults = () => {
+    navigate('/faults');
+  };
+
+  const handleLaunchTools = () => {
+    navigate('/tools');
   };
 
   return (
@@ -19,13 +23,16 @@ const HomePage = () => {
         <div className="feature">
           <h2>AR Fault Detection</h2>
           <p>Visualize and annotate faults in real-time using AR.</p>
-          <button className="ar-button" onClick={handleARCameraClick}>
-            Launch AR Camera
+          <button className="ar-button" onClick={handleLaunchFaults}>
+            Launch Faults
           </button>
         </div>
         <div className="feature">
           <h2>Tool Tracking</h2>
           <p>Ensure tool accountability with AR-assisted tracking.</p>
+          <button className="ar-button" onClick={handleLaunchTools}>
+            Launch Tools
+          </button>
         </div>
         <div className="feature">
           <h2>Secure Collaboration</h2>
