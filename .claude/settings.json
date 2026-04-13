@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:ar-vehicle-learn.replit.app)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\mindb\\Zarrar\\Software engineering\\ARSupportSystem\\backend\\app\\api\\endpoints"
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pip --version)",
+      "Bash(py --version)",
+      "Bash(py -m pip --version)"
+    ]
+  }
+}
