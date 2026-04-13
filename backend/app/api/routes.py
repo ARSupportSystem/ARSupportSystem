@@ -1,16 +1,12 @@
 from fastapi import APIRouter
+from app.api.endpoints import auth, users, faults, tools, annotations, audit
 
-router = APIRouter()
+# All routes are prefixed with /api
+router = APIRouter(prefix="/api")
 
-@router.get("/")
-async def read_root():
-    return {"message": "Welcome to the FastAPI application!"}
-
-
-@router.get("/health")
-async def health_check():
-    return {"status": "ok"}
-
-@router.get("/items/{item_id}")
-async def read_item(item_id: int):
-    return {"item_id": item_id}
+router.include_router(auth.router)
+router.include_router(users.router)
+router.include_router(faults.router)
+router.include_router(tools.router)
+router.include_router(annotations.router)
+router.include_router(audit.router)
