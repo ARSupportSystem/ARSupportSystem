@@ -9,6 +9,8 @@ POST /api/auth/refresh — re-issue a fresh token
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
+from uuid import uuid4
 import json
 
 from app.core.config import settings
@@ -16,6 +18,7 @@ from app.core.database import get_db
 from app.core.security import verify_password, create_access_token
 from app.models.user import User
 from app.models.audit_log import AuditLog
+from app.models.auth_token import AuthToken
 from app.schemas.auth import LoginRequest, TokenResponse
 from app.schemas.user import UserResponse
 from app.api.deps import get_current_user
@@ -52,12 +55,25 @@ def _authenticate(email: str, password: str, db: Session, ip: str) -> User:
     return user
 
 
-def _build_token(user: User) -> TokenResponse:
+def _build_token(user: User, db: Session) -> TokenResponse:
+    jti = str(uuid4())
+    expires_at = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     token = create_access_token({
         "sub": str(user.id),
         "email": user.email,
         "role": user.role.value,
+        "jti": jti,
     })
+
+    db.add(AuthToken(
+        user_id=user.id,
+        jti=jti,
+        token_type="access",
+        expires_at=expires_at,
+        is_revoked=False,
+    ))
+    db.commit()
+
     return TokenResponse(
         access_token=token,
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
@@ -84,7 +100,7 @@ def token_form_login(
     ip = request.client.host if request.client else None
     user = _authenticate(form_data.username, form_data.password, db, ip)
     _log(db, "LOGIN_SUCCESS", user_id=user.id, ip=ip)
-    return _build_token(user)
+    return _build_token(user, db)
 
 
 # ── JSON endpoint — used by the React frontend ──────────────────────────────
@@ -99,7 +115,7 @@ def json_login(
     ip = request.client.host if request.client else None
     user = _authenticate(payload.email, payload.password, db, ip)
     _log(db, "LOGIN_SUCCESS", user_id=user.id, ip=ip)
-    return _build_token(user)
+    return _build_token(user, db)
 
 
 # ── Protected endpoints ─────────────────────────────────────────────────────
@@ -111,6 +127,9 @@ def get_me(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/refresh", response_model=TokenResponse)
-def refresh_token(current_user: User = Depends(get_current_user)):
+def refresh_token(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Issues a fresh JWT for the currently authenticated user."""
-    return _build_token(current_user)
+    return _build_token(current_user, db)

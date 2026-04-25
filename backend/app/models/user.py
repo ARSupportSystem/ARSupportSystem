@@ -29,3 +29,4 @@ class User(Base):
     tool_sessions = relationship("ToolSession", back_populates="technician")
     annotations = relationship("ARAnnotation", back_populates="creator")
     audit_logs = relationship("AuditLog", back_populates="user")
+    auth_tokens = relationship("AuthToken", back_populates="user")

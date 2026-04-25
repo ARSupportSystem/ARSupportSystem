@@ -15,7 +15,12 @@ from app.core.database import get_db
 from app.core.security import hash_password
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, UserUpdate, UserResponse
-from app.api.deps import get_current_user, require_admin, require_supervisor_or_admin
+from app.api.deps import (
+    get_current_user,
+    get_current_user_optional,
+    require_admin,
+    require_supervisor_or_admin,
+)
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -32,15 +37,29 @@ def list_users(
 def create_user(
     payload: UserCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
+    total_users = db.query(User).count()
+
+    # Bootstrap rule: allow creating the first account without auth.
+    # The first account is always admin, regardless of requested role.
+    if total_users == 0:
+        role_to_set = UserRole.admin
+    else:
+        if not current_user:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+        if current_user.role != UserRole.admin:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires one of: ['admin']")
+        role_to_set = payload.role
+
     if db.query(User).filter(User.email == payload.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
+
     user = User(
         email=payload.email,
         full_name=payload.full_name,
         hashed_password=hash_password(payload.password),
-        role=payload.role,
+        role=role_to_set,
     )
     db.add(user)
     db.commit()
