@@ -1,18 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import './ARCamera.css';
 
 const ARCamera = () => {
   const { pathname } = useLocation();
   const isToolsPage = pathname === '/tools';
-  const fallbackVideoRef = useRef(null);
-  const fallbackStreamRef = useRef(null);
-  const [arStatus, setArStatus] = useState('Waiting for marker...');
+  const [arStatus, setArStatus] = useState('Ready to launch AR.js camera.');
   const [detectedMarker, setDetectedMarker] = useState(null);
   const [hologramMessage, setHologramMessage] = useState('');
-  const [isArSceneReady, setIsArSceneReady] = useState(false);
-  const [arSceneError, setArSceneError] = useState('');
-  const [isFallbackCameraActive, setIsFallbackCameraActive] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [faultForm, setFaultForm] = useState({
     severity: 'Medium',
@@ -24,111 +19,6 @@ const ARCamera = () => {
     toolName: '',
   });
   const arSceneUrl = useMemo(() => `/arjs/index.html?mode=${isToolsPage ? 'tools' : 'faults'}`, [isToolsPage]);
-
-  const stopFallbackCamera = () => {
-    if (fallbackStreamRef.current) {
-      fallbackStreamRef.current.getTracks().forEach((track) => track.stop());
-      fallbackStreamRef.current = null;
-    }
-
-    if (fallbackVideoRef.current) {
-      fallbackVideoRef.current.srcObject = null;
-    }
-
-    setIsFallbackCameraActive(false);
-  };
-
-  const startFallbackCamera = async () => {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setArSceneError('Camera API unavailable in this browser.');
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
-        audio: false,
-      });
-
-      fallbackStreamRef.current = stream;
-
-      if (fallbackVideoRef.current) {
-        fallbackVideoRef.current.srcObject = stream;
-        await fallbackVideoRef.current.play().catch(() => {});
-      }
-
-      setIsFallbackCameraActive(true);
-      setArStatus('Fallback camera mode active.');
-      setArSceneError('');
-    } catch {
-      setArSceneError('Unable to start fallback camera. Check browser camera permissions.');
-    }
-  };
-
-  useEffect(() => {
-    const resetTimer = window.setTimeout(() => {
-      setIsArSceneReady(false);
-      setArSceneError('');
-    }, 0);
-
-    const sceneWatchdog = window.setTimeout(() => {
-      setArSceneError('Embedded AR.js camera did not initialize. Use fallback camera mode below.');
-      startFallbackCamera();
-    }, 7000);
-
-    const handleMarkerEvent = (event) => {
-      if (event.origin !== window.location.origin || !event.data?.type) {
-        return;
-      }
-
-      if (event.data.type === 'arjs-status') {
-        setArStatus(event.data.message || 'AR.js ready.');
-      }
-
-      if (event.data.type === 'arjs-camera-live') {
-        setIsArSceneReady(true);
-        setArSceneError('');
-        setArStatus('AR.js camera live.');
-        window.clearTimeout(sceneWatchdog);
-      }
-
-      if (event.data.type === 'arjs-camera-error') {
-        setIsArSceneReady(false);
-        setArSceneError(event.data.message || 'AR.js camera failed to initialize.');
-        setArStatus('AR.js camera failed.');
-        window.clearTimeout(sceneWatchdog);
-      }
-
-      if (event.data.type === 'arjs-marker-found') {
-        const markerId = event.data.marker;
-
-        if (markerId === 'hiro') {
-          setDetectedMarker({ name: 'Hiro Marker' });
-          setHologramMessage('HIRO marker detected: maintenance overlay aligned.');
-          setArStatus('Hiro marker tracked.');
-        }
-
-        if (markerId === 'kanji') {
-          setDetectedMarker({ name: 'FLT-002 BMW 3 Series' });
-          setHologramMessage('FLT-002 fault profile loaded: inspect front-left assembly.');
-          setArStatus('FLT-002 marker tracked.');
-        }
-      }
-
-      if (event.data.type === 'arjs-marker-lost') {
-        setArStatus('Marker lost. Re-align marker in camera view.');
-      }
-    };
-
-    window.addEventListener('message', handleMarkerEvent);
-
-    return () => {
-      window.clearTimeout(resetTimer);
-      window.clearTimeout(sceneWatchdog);
-      window.removeEventListener('message', handleMarkerEvent);
-      stopFallbackCamera();
-    };
-  }, [arSceneUrl]);
 
   const pageContent = pathname === '/tools'
     ? {
@@ -164,6 +54,11 @@ const ARCamera = () => {
     setActionMessage(`${toolForm.toolName} (${toolForm.toolId}) ${verb}.`);
   };
 
+  const launchArCamera = () => {
+    setArStatus('Opening AR.js camera...');
+    window.location.href = arSceneUrl;
+  };
+
   const triggerMarkerDemo = (markerId) => {
     if (markerId === 'hiro') {
       setDetectedMarker({ name: 'Hiro Marker' });
@@ -187,26 +82,16 @@ const ARCamera = () => {
       
       <section className="ar-content">
         <div className="camera-view">
-          <iframe
-            title="AR.js Scene"
-            src={arSceneUrl}
-            className={`arjs-frame${isArSceneReady ? ' ready' : ''}`}
-            allow="camera; xr-spatial-tracking"
-          />
-          {isFallbackCameraActive && (
-            <video
-              ref={fallbackVideoRef}
-              className="fallback-feed"
-              autoPlay
-              muted
-              playsInline
-            />
-          )}
-          {arSceneError && (
-            <div className="arjs-overlay-warning">
-              <p>{arSceneError}</p>
-            </div>
-          )}
+          <div className="ar-launch-panel">
+            <p className="ar-launch-title">AR.js Camera Session</p>
+            <p className="ar-launch-text">
+              Launch AR.js in full-screen mode for reliable camera access and marker tracking.
+            </p>
+            <button className="control-btn" onClick={launchArCamera}>
+              Launch AR.js Camera
+            </button>
+            <p className="ar-launch-note">Use browser back to return here after scanning markers.</p>
+          </div>
           {hologramMessage && (
             <div className="hologram-overlay">
               <p className="hologram-title">
@@ -223,16 +108,6 @@ const ARCamera = () => {
             <p className="xr-status-label">AR.js Status</p>
             <p className="xr-status-message ok">{arStatus}</p>
           </div>
-          {!!arSceneError && !isFallbackCameraActive && (
-            <button className="control-btn" onClick={startFallbackCamera}>
-              Start Fallback Camera
-            </button>
-          )}
-          {isFallbackCameraActive && (
-            <button className="control-btn" onClick={stopFallbackCamera}>
-              Stop Fallback Camera
-            </button>
-          )}
 
           <div className="control-section">
             <h3>Hit Markers</h3>

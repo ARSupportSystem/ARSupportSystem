@@ -2,63 +2,60 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>AR.js Marker Scene</title>
+    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <style>
-      html,
-      body {
-        margin: 0;
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
-        background: #000;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      }
-
       #hud {
         position: fixed;
-        z-index: 10;
-        top: 0.6rem;
-        left: 0.6rem;
-        right: 0.6rem;
+        z-index: 1000;
+        top: 10px;
+        left: 10px;
+        right: 10px;
         pointer-events: none;
-        font-size: 12px;
-        color: #f5f5f5;
+        font-family: sans-serif;
+        color: white;
       }
-
       #hud > div {
-        display: inline-block;
-        padding: 0.4rem 0.55rem;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 8px;
         border-radius: 4px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        background: rgba(0, 0, 0, 0.45);
+        display: inline-block;
       }
-
-      .a-enter-vr,
-      .a-enter-ar {
-        display: none !important;
+      #toolbar {
+        position: fixed;
+        z-index: 1000;
+        right: 10px;
+        top: 10px;
+      }
+      #backBtn {
+        padding: 8px 16px;
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        border: 1px solid white;
+        border-radius: 4px;
+        cursor: pointer;
       }
     </style>
-    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
   </head>
-  <body>
-    <div id="hud"><div id="status">Initializing AR.js camera…</div></div>
+  <body style="margin: 0; overflow: hidden;">
+    <div id="hud"><div id="status">AR.js loading...</div></div>
+    <div id="toolbar"><button id="backBtn" type="button">Back</button></div>
 
     <a-scene
       embedded
-      renderer="logarithmicDepthBuffer: true; antialias: true; alpha: true"
       vr-mode-ui="enabled: false"
-      arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
+      arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
     >
       <a-marker preset="hiro" id="marker-hiro">
-        <a-box position="0 0.5 0" material="color: #00ffff; opacity: 0.35" depth="0.8" height="0.8" width="0.8"></a-box>
-        <a-text value="HIRO" align="center" position="0 1.1 0" color="#00ffff" scale="1.2 1.2 1.2"></a-text>
+        <a-box position="0 0.5 0" material="color: #00ffff; opacity: 0.5" depth="1" height="1" width="1"></a-box>
+        <a-text value="HIRO" align="center" position="0 1.2 0" color="#00ffff" scale="1.5 1.5 1.5"></a-text>
       </a-marker>
 
       <a-marker preset="kanji" id="marker-kanji">
-        <a-box position="0 0.5 0" material="color: #ff8800; opacity: 0.35" depth="0.8" height="0.8" width="0.8"></a-box>
-        <a-text value="FLT-002" align="center" position="0 1.1 0" color="#ff8800" scale="1.1 1.1 1.1"></a-text>
+        <a-box position="0 0.5 0" material="color: #ff8800; opacity: 0.5" depth="1" height="1" width="1"></a-box>
+        <a-text value="KANJI" align="center" position="0 1.2 0" color="#ff8800" scale="1.5 1.5 1.5"></a-text>
       </a-marker>
 
       <a-entity camera></a-entity>
@@ -66,6 +63,8 @@
 
     <script>
       const statusElement = document.getElementById('status');
+      const mode = new URLSearchParams(window.location.search).get('mode') || 'faults';
+      const modeText = mode === 'tools' ? 'Tools mode' : 'Faults mode';
 
       const sendStatus = (message) => {
         statusElement.textContent = message;
@@ -85,7 +84,14 @@
       };
 
       window.addEventListener('load', () => {
-        sendStatus('AR.js initializing...');
+        sendStatus(`AR.js initializing (${modeText})...`);
+
+        const backButton = document.getElementById('backBtn');
+        if (backButton) {
+          backButton.addEventListener('click', () => {
+            window.history.back();
+          });
+        }
 
         const hiro = document.getElementById('marker-hiro');
         const kanji = document.getElementById('marker-kanji');
@@ -134,8 +140,19 @@
           const onCameraReady = () => {
             window.clearTimeout(cameraBootstrapTimeout);
             window.clearTimeout(cameraFailTimeout);
-            sendStatus('AR.js ready. Point camera at Hiro or Kanji marker.');
+            sendStatus(`AR.js ready (${modeText}). Point camera at Hiro or Kanji marker.`);
             notifyCameraLive();
+
+            streamVideo.addEventListener('pause', () => {
+              sendStatus('Camera stream paused unexpectedly.');
+              notifyCameraError('Camera stream paused unexpectedly. Re-open AR camera.');
+            });
+
+            streamVideo.addEventListener('ended', () => {
+              sendStatus('Camera stream ended unexpectedly.');
+              notifyCameraError('Camera stream ended unexpectedly. Re-open AR camera.');
+            });
+
             streamVideo.removeEventListener('playing', onCameraReady);
           };
 
