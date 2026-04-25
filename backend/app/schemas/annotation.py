@@ -1,10 +1,12 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, Any
 from datetime import datetime
 from app.models.annotation import AnnotationType
 
 
 class AnnotationCreate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     fault_id: Optional[int] = None
     annotation_type: AnnotationType = AnnotationType.note
     title: Optional[str] = None
@@ -14,12 +16,16 @@ class AnnotationCreate(BaseModel):
 
 
 class AnnotationUpdate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     title: Optional[str] = None
     content: Optional[str] = None
     ar_position: Optional[Any] = None
 
 
 class AnnotationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     fault_id: Optional[int]
     annotation_type: AnnotationType
@@ -31,5 +37,3 @@ class AnnotationResponse(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime]
 
-    class Config:
-        from_attributes = True
