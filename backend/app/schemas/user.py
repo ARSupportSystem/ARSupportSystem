@@ -13,7 +13,7 @@ class UserCreate(BaseModel):
 
     email: EmailStr
     full_name: str = Field(min_length=1, max_length=120)
-    password: str = Field(min_length=1, max_length=128)
+    password: str = Field(min_length=12, max_length=128)
     role: UserRole = UserRole.technician
 
     @field_validator("full_name")

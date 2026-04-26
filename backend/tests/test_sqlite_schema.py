@@ -20,3 +20,4 @@ def test_sqlite_schema_contains_auth_tables():
     table_names = {row[0] for row in table_rows}
     assert "users" in table_names
     assert "auth_tokens" in table_names
+    assert "singleton_config" in table_names

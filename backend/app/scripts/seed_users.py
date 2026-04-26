@@ -9,19 +9,19 @@ SEED_USERS = [
         "email": "admin@test.com",
         "full_name": "Test Admin",
         "role": UserRole.admin,
-        "password": "Admin123!",
+        "password": "AdminSecure123!",
     },
     {
         "email": "supervisor@test.com",
         "full_name": "Test Supervisor",
         "role": UserRole.supervisor,
-        "password": "Supervisor123!",
+        "password": "SupervisorSecure123!",
     },
     {
         "email": "tech@test.com",
         "full_name": "Test Technician",
         "role": UserRole.technician,
-        "password": "Tech123!",
+        "password": "TechSecure123!",
     },
 ]
 

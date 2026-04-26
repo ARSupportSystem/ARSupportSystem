@@ -15,6 +15,7 @@ from app.models.audit_log import AuditLog
 from app.models.auth_token import AuthToken
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
+from app.services.system_config import get_or_create_singleton_config
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/users", tags=["users"])
@@ -53,19 +54,27 @@ def create_user(
 ) -> User:
     """Create a user account after enforcing strong password policy and uniqueness checks."""
     ip = request.client.host if request and request.client else None
+    password_feedback = get_password_strength_feedback(payload.password)
+    if not bool(password_feedback["valid"]):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=password_feedback)
+
+    singleton_config = get_or_create_singleton_config(db)
     total_users = db.query(User).count()
+    is_bootstrap = False
 
     if total_users == 0:
+        if singleton_config.bootstrap_complete:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bootstrap complete. Admin authentication is required to create users.",
+            )
         role_to_set = UserRole.admin
+        is_bootstrap = True
     else:
         if not current_user:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
         if current_user.role != UserRole.admin:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires one of: ['admin']")
-
-        password_feedback = get_password_strength_feedback(payload.password)
-        if not bool(password_feedback["valid"]):
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=password_feedback)
         role_to_set = payload.role
 
     try:
@@ -89,6 +98,25 @@ def create_user(
         db.rollback()
         logger.exception("Failed to create user", exc_info=exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create user")
+
+    if is_bootstrap:
+        try:
+            singleton_config.bootstrap_complete = True
+            db.commit()
+            _audit(
+                db,
+                "BOOTSTRAP_COMPLETED",
+                ip=ip,
+                user_id=user.id,
+                details={"bootstrap_user_id": user.id, "bootstrap_user_email": user.email},
+            )
+        except SQLAlchemyError as exc:
+            db.rollback()
+            logger.exception("Failed to mark bootstrap completion", exc_info=exc)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="User created, but failed to finalize bootstrap state",
+            )
 
     _audit(
         db,

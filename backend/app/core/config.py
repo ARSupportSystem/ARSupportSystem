@@ -1,11 +1,13 @@
 from typing import List, Optional
 
 from pydantic import model_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
+
+    model_config = SettingsConfigDict(env_file=".env")
 
     APP_NAME: str = "AR Support System"
     SECRET_KEY: str = "change-this-in-production"
@@ -15,6 +17,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_LOGIN: str = "5/minute"
     MAX_FAILED_LOGINS: int = 5
     FAILED_LOGIN_WINDOW_MINUTES: int = 10
+    BOOTSTRAP_COMPLETE: bool = False
     HTTPS_CERT_FILE: Optional[str] = None
     HTTPS_KEY_FILE: Optional[str] = None
 
@@ -34,9 +37,5 @@ class Settings(BaseSettings):
     def get_cors_origins(self) -> List[str]:
         """Return cleaned CORS origins from a comma-separated configuration value."""
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
-
-    class Config:
-        env_file = ".env"
-
 
 settings = Settings()

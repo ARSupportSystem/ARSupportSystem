@@ -4,6 +4,8 @@ from sqlalchemy.orm import sessionmaker
 from unittest.mock import patch
 
 from app.core.database import Base
+from app.models.audit_log import AuditLog
+from app.models.system_config import SingletonConfig
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreate
 import app.api.endpoints.users as users_endpoint
@@ -11,7 +13,7 @@ import app.api.endpoints.users as users_endpoint
 
 def _make_db_session():
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
-    Base.metadata.create_all(bind=engine, tables=[User.__table__])
+    Base.metadata.create_all(bind=engine, tables=[User.__table__, AuditLog.__table__, SingletonConfig.__table__])
     session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     return session_local()
 
@@ -22,7 +24,7 @@ def test_first_user_can_be_bootstrapped_without_token_and_is_admin():
         payload = UserCreate(
             email="first-admin@example.com",
             full_name="First Admin",
-            password="supersecret",
+            password="TestPassword123!",
             role=UserRole.technician,
         )
 
@@ -31,6 +33,9 @@ def test_first_user_can_be_bootstrapped_without_token_and_is_admin():
 
         assert created.role == UserRole.admin
         assert created.email == "first-admin@example.com"
+        singleton = db.query(SingletonConfig).filter(SingletonConfig.id == 1).first()
+        assert singleton is not None
+        assert singleton.bootstrap_complete is True
     finally:
         db.close()
 
@@ -41,7 +46,7 @@ def test_second_user_requires_authentication():
         first_payload = UserCreate(
             email="first-admin@example.com",
             full_name="First Admin",
-            password="supersecret",
+            password="TestPassword123!",
             role=UserRole.admin,
         )
         with patch.object(users_endpoint, "hash_password", return_value="fake-hash"):
@@ -50,7 +55,7 @@ def test_second_user_requires_authentication():
         second_payload = UserCreate(
             email="second@example.com",
             full_name="Second User",
-            password="supersecret",
+            password="TestPassword123!",
             role=UserRole.technician,
         )
 
@@ -60,5 +65,28 @@ def test_second_user_requires_authentication():
         except HTTPException as exc:
             assert exc.status_code == 401
             assert exc.detail == "Not authenticated"
+    finally:
+        db.close()
+
+
+def test_bootstrap_path_disabled_when_singleton_marks_complete():
+    db = _make_db_session()
+    try:
+        db.add(SingletonConfig(id=1, bootstrap_complete=True))
+        db.commit()
+
+        payload = UserCreate(
+            email="first-admin@example.com",
+            full_name="First Admin",
+            password="TestPassword123!",
+            role=UserRole.admin,
+        )
+
+        try:
+            users_endpoint.create_user(payload=payload, db=db, current_user=None)
+            assert False, "Expected HTTPException when bootstrap is marked complete"
+        except HTTPException as exc:
+            assert exc.status_code == 403
+            assert exc.detail == "Bootstrap complete. Admin authentication is required to create users."
     finally:
         db.close()
