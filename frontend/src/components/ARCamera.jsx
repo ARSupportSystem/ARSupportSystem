@@ -1,10 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { getFaultByMarkerRequest } from '../services/faultsApi';
 import './ARCamera.css';
 
 const ARCamera = () => {
   const { pathname } = useLocation();
   const isToolsPage = pathname === '/tools';
+  const token = localStorage.getItem('authToken') || '';
   const [arStatus, setArStatus] = useState('Ready to launch AR.js camera.');
   const [detectedMarker, setDetectedMarker] = useState(null);
   const [hologramMessage, setHologramMessage] = useState('');
@@ -29,6 +31,47 @@ const ARCamera = () => {
         title: 'Faults - AR Detection',
         subtitle: 'Point your device at target areas to detect and visualize faults.',
       };
+
+  const resolveFaultByMarker = useCallback(async (markerId, source = 'AR.js marker') => {
+    setArStatus(`${source} detected (${markerId}). Looking up fault...`);
+
+    try {
+      const fault = await getFaultByMarkerRequest(token, markerId);
+      setDetectedMarker({ name: markerId, fault });
+      setHologramMessage(
+        `${fault.title} (${fault.severity}) • ${fault.location}${fault.location_detail ? ` - ${fault.location_detail}` : ''}`,
+      );
+      setArStatus(`Loaded fault ${fault.id} for marker ${markerId}.`);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'Unable to fetch fault';
+      setDetectedMarker({ name: markerId });
+      setHologramMessage(`No backend fault found for marker ${markerId}.`);
+      setArStatus(detail);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    const handleMessage = (event) => {
+      const payload = event.data;
+      if (!payload || typeof payload !== 'object') {
+        return;
+      }
+
+      if (payload.type === 'arjs-status' && payload.message) {
+        setArStatus(payload.message);
+        return;
+      }
+
+      if (payload.type === 'arjs-marker-found' && payload.marker) {
+        resolveFaultByMarker(payload.marker, 'AR.js');
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [resolveFaultByMarker]);
 
   const handleFaultCapture = () => {
     if (!faultForm.zone.trim() || !faultForm.faultType.trim()) {
@@ -60,17 +103,7 @@ const ARCamera = () => {
   };
 
   const triggerMarkerDemo = (markerId) => {
-    if (markerId === 'hiro') {
-      setDetectedMarker({ name: 'Hiro Marker' });
-      setHologramMessage('HIRO marker detected: maintenance overlay aligned.');
-      setArStatus('Hiro marker triggered manually.');
-    }
-
-    if (markerId === 'kanji') {
-      setDetectedMarker({ name: 'FLT-002 BMW 3 Series' });
-      setHologramMessage('FLT-002 fault profile loaded: inspect front-left assembly.');
-      setArStatus('FLT-002 marker triggered manually.');
-    }
+    resolveFaultByMarker(markerId, 'Manual trigger');
   };
 
   return (

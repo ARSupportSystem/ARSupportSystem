@@ -7,6 +7,10 @@
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <style>
+      :root {
+        color-scheme: dark;
+      }
+
       #hud {
         position: fixed;
         z-index: 1000;
@@ -14,15 +18,80 @@
         left: 10px;
         right: 10px;
         pointer-events: none;
-        font-family: sans-serif;
+        font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         color: white;
       }
       #hud > div {
-        background: rgba(0, 0, 0, 0.6);
-        padding: 8px;
-        border-radius: 4px;
+        background: rgba(11, 16, 28, 0.76);
+        border: 1px solid rgba(116, 173, 255, 0.3);
+        backdrop-filter: blur(6px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+        padding: 10px 12px;
+        border-radius: 10px;
         display: inline-block;
       }
+
+      #status {
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      #faultDetails {
+        margin-top: 8px;
+        max-width: min(92vw, 520px);
+        display: none;
+        padding: 12px;
+      }
+
+      .fault-card-title {
+        font-size: 14px;
+        font-weight: 700;
+        margin: 0 0 8px;
+      }
+
+      .fault-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin: 0 0 10px;
+      }
+
+      .fault-chip {
+        font-size: 11px;
+        line-height: 1;
+        padding: 6px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .fault-chip.severity-low { border-color: rgba(110, 231, 183, 0.6); color: #6ee7b7; }
+      .fault-chip.severity-medium { border-color: rgba(251, 191, 36, 0.6); color: #fbbf24; }
+      .fault-chip.severity-high { border-color: rgba(251, 146, 60, 0.7); color: #fb923c; }
+      .fault-chip.severity-critical { border-color: rgba(248, 113, 113, 0.8); color: #f87171; }
+
+      .fault-row {
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.45;
+        color: #dbeafe;
+      }
+
+      .fault-row + .fault-row {
+        margin-top: 4px;
+      }
+
+      .fault-label {
+        color: #93c5fd;
+        font-weight: 600;
+      }
+
+      .fault-error {
+        margin: 0;
+        font-size: 12px;
+        color: #fecaca;
+      }
+
       #toolbar {
         position: fixed;
         z-index: 1000;
@@ -31,16 +100,38 @@
       }
       #backBtn {
         padding: 8px 16px;
-        background: rgba(0, 0, 0, 0.6);
+        background: rgba(11, 16, 28, 0.76);
         color: white;
-        border: 1px solid white;
-        border-radius: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        border-radius: 8px;
         cursor: pointer;
+        font-weight: 600;
+      }
+
+      @media (max-width: 600px) {
+        #hud {
+          top: 8px;
+          left: 8px;
+          right: 8px;
+        }
+
+        #toolbar {
+          top: 8px;
+          right: 8px;
+        }
+
+        #backBtn {
+          padding: 7px 12px;
+          font-size: 12px;
+        }
       }
     </style>
   </head>
   <body style="margin: 0; overflow: hidden;">
-    <div id="hud"><div id="status">AR.js loading...</div></div>
+    <div id="hud">
+      <div id="status">AR.js loading...</div>
+      <div id="faultDetails"></div>
+    </div>
     <div id="toolbar"><button id="backBtn" type="button">Back</button></div>
 
     <a-scene
@@ -63,8 +154,11 @@
 
     <script>
       const statusElement = document.getElementById('status');
+      const faultDetailsElement = document.getElementById('faultDetails');
       const mode = new URLSearchParams(window.location.search).get('mode') || 'faults';
       const modeText = mode === 'tools' ? 'Tools mode' : 'Faults mode';
+      const API_BASE_URL = `${window.location.origin}`;
+      const authToken = localStorage.getItem('authToken') || '';
 
       const sendStatus = (message) => {
         statusElement.textContent = message;
@@ -81,6 +175,93 @@
 
       const notifyCameraError = (message) => {
         window.parent.postMessage({ type: 'arjs-camera-error', message }, window.location.origin);
+      };
+
+      const escapeHtml = (value) => String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+
+      const severityClass = (severity) => `severity-${String(severity || '').toLowerCase()}`;
+
+      const setFaultDetails = (content, isHtml = false) => {
+        if (!faultDetailsElement) {
+          return;
+        }
+
+        if (!content) {
+          faultDetailsElement.style.display = 'none';
+          faultDetailsElement.textContent = '';
+          return;
+        }
+
+        faultDetailsElement.style.display = 'inline-block';
+        if (isHtml) {
+          faultDetailsElement.innerHTML = content;
+        } else {
+          faultDetailsElement.textContent = content;
+        }
+      };
+
+      const fetchFaultByMarker = async (markerId) => {
+        if (!authToken) {
+          setFaultDetails(
+            `<p class="fault-card-title">Marker ${escapeHtml(markerId)}</p><p class="fault-error">Sign in required to load backend fault details.</p>`,
+            true,
+          );
+          return;
+        }
+
+        setFaultDetails(`<p class="fault-card-title">Marker ${escapeHtml(markerId)}</p><p class="fault-row">Loading fault details...</p>`, true);
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/faults/marker/${encodeURIComponent(markerId)}`, {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+            },
+          });
+
+          const contentType = response.headers.get('content-type') || '';
+          const payload = contentType.includes('application/json')
+            ? await response.json()
+            : await response.text();
+
+          if (!response.ok) {
+            const detail = typeof payload === 'object' && payload !== null
+              ? payload.detail || JSON.stringify(payload)
+              : payload || 'Unable to load fault details';
+            setFaultDetails(
+              `<p class="fault-card-title">Marker ${escapeHtml(markerId)}</p><p class="fault-error">${escapeHtml(detail)}</p>`,
+              true,
+            );
+            return;
+          }
+
+          setFaultDetails(
+            `
+              <p class="fault-card-title">Fault #${escapeHtml(payload.id)} · ${escapeHtml(payload.title)}</p>
+              <div class="fault-meta">
+                <span class="fault-chip ${severityClass(payload.severity)}">${escapeHtml(payload.severity)}</span>
+                <span class="fault-chip">${escapeHtml(payload.status)}</span>
+                <span class="fault-chip">marker: ${escapeHtml(markerId)}</span>
+              </div>
+              <p class="fault-row"><span class="fault-label">Location:</span> ${escapeHtml(payload.location)}${payload.location_detail ? ` (${escapeHtml(payload.location_detail)})` : ''}</p>
+              ${payload.description ? `<p class="fault-row"><span class="fault-label">Description:</span> ${escapeHtml(payload.description)}</p>` : ''}
+            `,
+            true,
+          );
+
+          window.parent.postMessage({ type: 'arjs-fault-loaded', marker: markerId, fault: payload }, window.location.origin);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Unable to load fault details';
+          setFaultDetails(
+            `<p class="fault-card-title">Marker ${escapeHtml(markerId)}</p><p class="fault-error">${escapeHtml(message)}</p>`,
+            true,
+          );
+        }
       };
 
       window.addEventListener('load', () => {
@@ -100,6 +281,7 @@
           hiro.addEventListener('markerFound', () => {
             sendStatus('Hiro marker found.');
             notifyMarker('arjs-marker-found', 'hiro');
+            fetchFaultByMarker('hiro');
           });
 
           hiro.addEventListener('markerLost', () => {
@@ -112,6 +294,7 @@
           kanji.addEventListener('markerFound', () => {
             sendStatus('Kanji marker found.');
             notifyMarker('arjs-marker-found', 'kanji');
+            fetchFaultByMarker('kanji');
           });
 
           kanji.addEventListener('markerLost', () => {
