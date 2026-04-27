@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'r
 import Header from './components/Header';
 import HomePage from './components/HomePage';
 import ARCamera from './components/ARCamera';
+import MarkersPage from './components/MarkersPage';
 import LoginPage from './components/LoginPage';
 import { getMeRequest, loginRequest, logoutRequest } from './services/authApi';
 import './App.css';
@@ -23,7 +24,27 @@ function ProtectedRoute({ isAuthenticated, isReady, children }) {
   return children;
 }
 
-function AppRoutes({ isAuthenticated, isReady, onLogin, isSubmitting, loginError }) {
+function AdminRoute({ isAuthenticated, isReady, currentUser, children }) {
+  if (!isReady) {
+    return (
+      <section className="auth-loading">
+        <p>Checking session…</p>
+      </section>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (currentUser?.role !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
+
+function AppRoutes({ isAuthenticated, isReady, currentUser, onLogin, isSubmitting, loginError }) {
   const location = useLocation();
 
   return (
@@ -42,7 +63,7 @@ function AppRoutes({ isAuthenticated, isReady, onLogin, isSubmitting, loginError
             path="/"
             element={
               <ProtectedRoute isAuthenticated={isAuthenticated} isReady={isReady}>
-                <HomePage />
+                <HomePage currentUser={currentUser} />
               </ProtectedRoute>
             }
           />
@@ -67,8 +88,16 @@ function AppRoutes({ isAuthenticated, isReady, onLogin, isSubmitting, loginError
             path="/monitoring"
             element={
               <ProtectedRoute isAuthenticated={isAuthenticated} isReady={isReady}>
-                <HomePage />
+                <HomePage currentUser={currentUser} />
               </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/markers"
+            element={
+              <AdminRoute isAuthenticated={isAuthenticated} isReady={isReady} currentUser={currentUser}>
+                <MarkersPage />
+              </AdminRoute>
             }
           />
         </Routes>
@@ -94,7 +123,7 @@ function App() {
       try {
         const me = await getMeRequest(token);
         setCurrentUser(me);
-      } catch (error) {
+      } catch {
         localStorage.removeItem('authToken');
         setToken('');
         setCurrentUser(null);
@@ -130,7 +159,8 @@ function App() {
     if (token) {
       try {
         await logoutRequest(token);
-      } catch (error) {
+      } catch {
+        // Logout failures should not block local session cleanup.
       }
     }
 
@@ -147,6 +177,7 @@ function App() {
         <AppRoutes
           isAuthenticated={Boolean(currentUser)}
           isReady={isReady}
+          currentUser={currentUser}
           onLogin={handleLogin}
           isSubmitting={isSubmitting}
           loginError={loginError}

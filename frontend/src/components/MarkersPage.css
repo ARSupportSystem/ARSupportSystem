@@ -1,0 +1,189 @@
+.markers-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.markers-hero {
+  background: linear-gradient(140deg, #151515 0%, #1d1d1d 70%);
+  border: 1px solid #2b2b2b;
+  border-radius: 4px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.markers-hero h1 {
+  margin: 0 0 0.6rem;
+  color: #f8fafc;
+}
+
+.markers-hero p {
+  margin: 0;
+  color: #b3b3b3;
+  line-height: 1.5;
+}
+
+.markers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.marker-panel {
+  border: 1px solid #2b2b2b;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #171717 0%, #121212 100%);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+  padding: 1.2rem;
+}
+
+.marker-panel h2 {
+  margin: 0 0 1rem;
+  color: #f8fafc;
+  font-size: 1.2rem;
+}
+
+.marker-help-text {
+  margin: 0 0 0.8rem;
+  color: #b3b3b3;
+}
+
+.marker-help-text code {
+  color: #fb923c;
+}
+
+.marker-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.marker-form label {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
+
+.marker-form input,
+.marker-form textarea {
+  width: 100%;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  background: #111;
+  color: #e2e8f0;
+  padding: 0.62rem 0.7rem;
+  box-sizing: border-box;
+}
+
+.marker-form textarea {
+  resize: vertical;
+}
+
+.marker-btn {
+  border: none;
+  border-radius: 4px;
+  padding: 0.66rem 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: #241b10;
+  color: #f59e0b;
+  box-shadow: inset 0 0 0 1px #7c4a03;
+}
+
+.marker-btn:hover {
+  background: #2d2113;
+  color: #fb923c;
+}
+
+.marker-btn-secondary {
+  background: #1f2937;
+  color: #cbd5e1;
+  box-shadow: inset 0 0 0 1px #374151;
+}
+
+.marker-feedback {
+  margin-bottom: 1rem;
+}
+
+.marker-error,
+.marker-success {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: 4px;
+}
+
+.marker-error {
+  background: rgba(127, 29, 29, 0.35);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  color: #fecaca;
+}
+
+.marker-success {
+  background: rgba(6, 78, 59, 0.35);
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  color: #a7f3d0;
+}
+
+.marker-list-panel {
+  margin-bottom: 1rem;
+}
+
+.marker-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.marker-list-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.marker-table-wrap {
+  margin-top: 0.9rem;
+  overflow-x: auto;
+}
+
+.marker-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.marker-table th,
+.marker-table td {
+  border-bottom: 1px solid #2e2e2e;
+  text-align: left;
+  padding: 0.62rem;
+  font-size: 0.92rem;
+}
+
+.marker-table th {
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+.marker-table td {
+  color: #e2e8f0;
+}
+
+.marker-preview {
+  display: block;
+  width: 84px;
+  height: 84px;
+  object-fit: contain;
+  border: 1px solid #2e2e2e;
+  border-radius: 4px;
+  background: #0b0b0b;
+  padding: 4px;
+}
+
+@media (max-width: 768px) {
+  .marker-preview {
+    width: 64px;
+    height: 64px;
+  }
+}

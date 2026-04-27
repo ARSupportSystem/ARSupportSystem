@@ -12,3 +12,4 @@ python-dotenv
 httpx
 pytest
 pytest-asyncio
+slowapi

@@ -45,6 +45,7 @@ htmlcov/
 *.sqlite3
 *.db
 certs/
+uploads/
 
 # Jupyter
 .ipynb_checkpoints/

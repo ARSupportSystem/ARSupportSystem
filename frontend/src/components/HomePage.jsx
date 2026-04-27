@@ -2,8 +2,9 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import './HomePage.css';
 
-const HomePage = () => {
+const HomePage = ({ currentUser }) => {
   const navigate = useNavigate();
+  const isAdmin = currentUser?.role === 'admin';
 
   const handleLaunchFaults = () => {
     navigate('/faults');
@@ -11,6 +12,10 @@ const HomePage = () => {
 
   const handleLaunchTools = () => {
     navigate('/tools');
+  };
+
+  const handleManageMarkers = () => {
+    navigate('/markers');
   };
 
   return (
@@ -38,6 +43,15 @@ const HomePage = () => {
           <h2>Secure Collaboration</h2>
           <p>Share information securely between authorized users.</p>
         </div>
+        {isAdmin && (
+          <div className="feature">
+            <h2>Marker Upload & Registry</h2>
+            <p>Pre-register printable markers so technicians can attach faults by scanning existing IDs.</p>
+            <button className="ar-button" onClick={handleManageMarkers}>
+              Manage Markers
+            </button>
+          </div>
+        )}
       </section>
     </div>
   );

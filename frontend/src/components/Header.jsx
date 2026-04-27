@@ -36,6 +36,13 @@ const Header = ({ isAuthenticated, currentUser, onLogout }) => {
                   Monitoring
                 </NavLink>
               </li>
+              {currentUser?.role === 'admin' && (
+                <li>
+                  <NavLink to="/markers" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+                    Markers
+                  </NavLink>
+                </li>
+              )}
               <li className="user-pill">{currentUser?.full_name} ({roleLabel})</li>
               <li>
                 <button type="button" className="nav-link nav-logout" onClick={onLogout}>

@@ -54,4 +54,5 @@ class FaultResponse(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime]
     resolved_at: Optional[datetime]
+    distance_from_marker_m: Optional[float] = None
 
