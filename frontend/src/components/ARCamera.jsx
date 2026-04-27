@@ -20,7 +20,11 @@ const ARCamera = () => {
     toolId: '',
     toolName: '',
   });
-  const arSceneUrl = useMemo(() => `/arjs/index.html?mode=${isToolsPage ? 'tools' : 'faults'}`, [isToolsPage]);
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+  const arSceneUrl = useMemo(
+    () => `/arjs/index.html?mode=${isToolsPage ? 'tools' : 'faults'}&apiBase=${encodeURIComponent(apiBaseUrl)}`,
+    [apiBaseUrl, isToolsPage],
+  );
 
   const pageContent = pathname === '/tools'
     ? {

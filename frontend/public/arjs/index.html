@@ -155,9 +155,10 @@
     <script>
       const statusElement = document.getElementById('status');
       const faultDetailsElement = document.getElementById('faultDetails');
-      const mode = new URLSearchParams(window.location.search).get('mode') || 'faults';
+      const params = new URLSearchParams(window.location.search);
+      const mode = params.get('mode') || 'faults';
       const modeText = mode === 'tools' ? 'Tools mode' : 'Faults mode';
-      const API_BASE_URL = `${window.location.origin}`;
+      const API_BASE_URL = params.get('apiBase') || 'http://localhost:8000';
       const authToken = localStorage.getItem('authToken') || '';
 
       const sendStatus = (message) => {
@@ -235,6 +236,14 @@
               : payload || 'Unable to load fault details';
             setFaultDetails(
               `<p class="fault-card-title">Marker ${escapeHtml(markerId)}</p><p class="fault-error">${escapeHtml(detail)}</p>`,
+              true,
+            );
+            return;
+          }
+
+          if (!payload || typeof payload !== 'object') {
+            setFaultDetails(
+              `<p class="fault-card-title">Marker ${escapeHtml(markerId)}</p><p class="fault-error">Unexpected backend response format. Check API base URL.</p>`,
               true,
             );
             return;
