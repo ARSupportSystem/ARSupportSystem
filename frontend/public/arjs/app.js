@@ -158,7 +158,7 @@ const monitorCameraVideo = ({ onReady, onTimeout }) => {
   checkVideo();
 };
 
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
   sendStatus(`AR.js initializing (${modeText})...`);
 
   const backButton = document.getElementById('backBtn');
@@ -166,12 +166,61 @@ window.addEventListener('load', () => {
     backButton.addEventListener('click', () => window.history.back());
   }
 
-  wireMarker('marker-hiro', 'hiro', 'Hiro');
-  wireMarker('marker-kanji', 'kanji', 'Kanji');
+  const sceneEl = document.querySelector('a-scene');
+  let loadedMarkersCount = 0;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/markers?active_only=true`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+      },
+    });
+
+    if (response.ok) {
+      const markers = await response.json();
+      const validMarkers = markers.filter((m) => m.image_url);
+      
+      validMarkers.forEach((marker) => {
+        const markerEl = document.createElement('a-marker');
+        markerEl.setAttribute('id', `marker-${marker.marker_id}`);
+        markerEl.setAttribute('preset', 'custom');
+        // Using the image_url as pattern. AFrame AR.js supports custom patterns via URL.
+        const url = marker.image_url.startsWith('http') 
+          ? marker.image_url 
+          : `${API_BASE_URL}${marker.image_url}`;
+        markerEl.setAttribute('type', 'pattern');
+        markerEl.setAttribute('url', url);
+
+        const box = document.createElement('a-box');
+        box.setAttribute('position', '0 0.5 0');
+        box.setAttribute('material', 'color: #00ffff; opacity: 0.5');
+        box.setAttribute('depth', '1');
+        box.setAttribute('height', '1');
+        box.setAttribute('width', '1');
+
+        const text = document.createElement('a-text');
+        text.setAttribute('value', marker.marker_id);
+        text.setAttribute('align', 'center');
+        text.setAttribute('position', '0 1.2 0');
+        text.setAttribute('color', '#00ffff');
+        text.setAttribute('scale', '1.5 1.5 1.5');
+
+        markerEl.appendChild(box);
+        markerEl.appendChild(text);
+        sceneEl.appendChild(markerEl);
+
+        wireMarker(`marker-${marker.marker_id}`, marker.marker_id, marker.marker_id);
+        loadedMarkersCount++;
+      });
+    }
+  } catch (err) {
+    console.error('Failed to load markers for AR scene', err);
+  }
 
   monitorCameraVideo({
     onReady: (streamVideo) => {
-      sendStatus(`AR.js ready (${modeText}). Point camera at Hiro or Kanji marker.`);
+      sendStatus(`AR.js ready (${modeText}). Point camera at any uploaded marker (${loadedMarkersCount} loaded).`);
 
       streamVideo.addEventListener('pause', () => {
         sendStatus('Camera stream paused unexpectedly. Re-open AR camera.');

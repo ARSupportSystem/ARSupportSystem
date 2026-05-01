@@ -229,7 +229,6 @@ def get_marker(
 def get_marker_image(
     marker_id: str,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
 ):
     marker = db.query(Marker).filter(Marker.marker_id == marker_id).first()
     if not marker:

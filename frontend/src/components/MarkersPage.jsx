@@ -61,33 +61,16 @@ const MarkersPage = () => {
     }
   };
 
-  const handleDownloadPrintableSheet = () => {
+  const handlePrintMarker = (marker) => {
     setErrorMessage('');
-    const printableMarkers = markers.filter((marker) => marker.image_url);
-    if (printableMarkers.length === 0) {
-      setErrorMessage('No marker images are available to print yet.');
+    if (!marker.image_url) {
+      setErrorMessage('This marker does not have an image to print.');
       return;
     }
 
-    const popup = window.open('', '_blank', 'noopener,noreferrer,width=1200,height=900');
-    if (!popup) {
-      setErrorMessage('Popup blocked. Please allow popups to open printable marker sheet.');
-      return;
-    }
-
-    const cards = printableMarkers.map((marker) => {
-      const imageUrl = marker.image_url?.startsWith('http')
-        ? marker.image_url
-        : `${apiBaseUrl}${marker.image_url}`;
-
-      return `
-        <article class="marker-card">
-          <img src="${escapeHtml(imageUrl)}" alt="Marker ${escapeHtml(marker.marker_id)}" />
-          <h3>${escapeHtml(marker.marker_id)}</h3>
-          <p>${escapeHtml(marker.label || 'Uploaded marker')}</p>
-        </article>
-      `;
-    }).join('');
+    const imageUrl = marker.image_url?.startsWith('http')
+      ? marker.image_url
+      : `${apiBaseUrl}${marker.image_url}`;
 
     const sheetHtml = `
       <!doctype html>
@@ -95,16 +78,13 @@ const MarkersPage = () => {
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Marker Sheet</title>
+        <title>Print Marker - ${escapeHtml(marker.marker_id)}</title>
         <style>
-          body { font-family: Inter, Arial, sans-serif; margin: 24px; color: #111827; }
-          h1 { margin: 0 0 8px; font-size: 24px; }
-          .sub { margin: 0 0 20px; color: #4b5563; }
-          .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-          .marker-card { border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; text-align: center; page-break-inside: avoid; }
-          .marker-card img { width: 100%; max-width: 220px; height: 220px; object-fit: contain; margin: 0 auto 8px; display: block; }
-          .marker-card h3 { margin: 0 0 4px; font-size: 16px; letter-spacing: 0.4px; }
-          .marker-card p { margin: 0; font-size: 12px; color: #6b7280; }
+          body { font-family: Inter, Arial, sans-serif; margin: 24px; color: #111827; text-align: center; }
+          .marker-card { display: inline-block; border: 1px solid #d1d5db; border-radius: 8px; padding: 24px; }
+          .marker-card img { width: 100%; max-width: 400px; height: auto; object-fit: contain; margin: 0 auto 16px; display: block; }
+          .marker-card h3 { margin: 0 0 8px; font-size: 24px; letter-spacing: 0.4px; }
+          .marker-card p { margin: 0; font-size: 16px; color: #6b7280; }
           @media print {
             body { margin: 8mm; }
             .print-hint { display: none; }
@@ -112,18 +92,51 @@ const MarkersPage = () => {
         </style>
       </head>
       <body>
-        <h1>Printable Marker Sheet</h1>
-        <p class="sub">Print this page (or Save as PDF) and distribute markers to technicians.</p>
         <p class="print-hint">Tip: Use browser print and choose "Save as PDF" for download.</p>
-        <section class="grid">${cards}</section>
-        <script>window.onload = () => window.print();</script>
+        <div class="marker-card">
+          <img src="${escapeHtml(imageUrl)}" alt="Marker ${escapeHtml(marker.marker_id)}" />
+          <h3>${escapeHtml(marker.marker_id)}</h3>
+          <p>${escapeHtml(marker.label || 'Uploaded marker')}</p>
+        </div>
+        <script>
+          window.onload = () => {
+            window.print();
+            // Optional: you can communicate back to parent if needed, but setTimeout works to allow print dialog to open
+          };
+        </script>
       </body>
       </html>
     `;
 
-    popup.document.open();
-    popup.document.write(sheetHtml);
-    popup.document.close();
+    // Create a hidden iframe
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    
+    document.body.appendChild(iframe);
+
+    // Write the content to the iframe
+    iframe.contentWindow.document.open();
+    iframe.contentWindow.document.write(sheetHtml);
+    iframe.contentWindow.document.close();
+
+    // After print finishes or after a timeout, remove the iframe
+    // Note: window.onafterprint in the iframe is an option, but browsers handle iframe printing timeouts differently.
+    // Easiest is to listen on the iframe's contentWindow window.onafterprint
+    iframe.contentWindow.onafterprint = () => {
+      document.body.removeChild(iframe);
+    };
+    
+    // Fallback if onafterprint is not supported or not triggered
+    setTimeout(() => {
+      if (document.body.contains(iframe)) {
+        document.body.removeChild(iframe);
+      }
+    }, 60000); // 1 minute timeout cleanup
   };
 
   return (
@@ -168,19 +181,14 @@ const MarkersPage = () => {
       )}
 
       <section className="marker-panel marker-list-panel">
-        <div className="marker-list-header">
+          <div className="marker-list-header">
           <h2>Registered Markers</h2>
           <div className="marker-list-actions">
-            <button type="button" className="marker-btn marker-btn-secondary" onClick={handleDownloadPrintableSheet}>
-              Download Printable Sheet
-            </button>
             <button type="button" className="marker-btn marker-btn-secondary" onClick={refreshMarkers}>
               Refresh
             </button>
           </div>
-        </div>
-
-        {loading ? (
+        </div>        {loading ? (
           <p>Loading markers...</p>
         ) : markers.length === 0 ? (
           <p>No markers found yet.</p>
@@ -193,6 +201,7 @@ const MarkersPage = () => {
                   <th>Preview</th>
                   <th>Source image</th>
                   <th>Active</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -212,6 +221,16 @@ const MarkersPage = () => {
                     </td>
                     <td>{marker.label || '-'}</td>
                     <td>{marker.is_active ? 'Yes' : 'No'}</td>
+                    <td>
+                      {marker.image_url && (
+                        <button 
+                          className="marker-btn marker-btn-secondary" 
+                          onClick={() => handlePrintMarker(marker)}
+                        >
+                          Print
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
