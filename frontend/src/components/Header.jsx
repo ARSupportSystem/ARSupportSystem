@@ -32,6 +32,11 @@ const Header = ({ isAuthenticated, currentUser, onLogout }) => {
                 </NavLink>
               </li>
               <li>
+                <NavLink to="/tools-admin" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+                  Manage Tools
+                </NavLink>
+              </li>
+              <li>
                 <NavLink to="/monitoring" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
                   Monitoring
                 </NavLink>

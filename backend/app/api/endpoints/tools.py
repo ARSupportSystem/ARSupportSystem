@@ -19,14 +19,28 @@ from datetime import datetime
 
 from app.core.database import get_db
 from app.models.user import User, UserRole
-from app.models.tool import Tool, ToolSession, ToolSessionItem, ToolSessionStatus
+from app.models.fault import Fault
+from app.models.tool import Tool, ToolSession, ToolSessionItem, ToolSessionStatus, ToolAction
 from app.schemas.tool import (
     ToolCreate, ToolUpdate, ToolResponse,
     ToolSessionCreate, ToolSessionComplete, ToolSessionResponse,
+    ToolActionCreate, ToolActionResponse,
 )
 from app.api.deps import get_current_user, require_admin
 
 router = APIRouter(prefix="/tools", tags=["tools"])
+
+
+def _assert_marker_unique(db: Session, marker_id: str, exclude_tool_id: int = None) -> None:
+    """Raise 400 if marker_id is already assigned to another tool or any fault."""
+    tool_q = db.query(Tool).filter(Tool.marker_id == marker_id)
+    if exclude_tool_id:
+        tool_q = tool_q.filter(Tool.id != exclude_tool_id)
+    if tool_q.first():
+        raise HTTPException(status_code=400, detail="Marker is already assigned to another tool.")
+
+    if db.query(Fault).filter(Fault.ar_marker_id == marker_id).first():
+        raise HTTPException(status_code=400, detail="Marker is already assigned to a fault.")
 
 
 # ── Tool CRUD ──────────────────────────────────────────────────────────────
@@ -43,15 +57,40 @@ def list_tools(
     return q.all()
 
 
+@router.post("/action", response_model=ToolActionResponse, status_code=status.HTTP_201_CREATED)
+def log_tool_action(
+    payload: ToolActionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    tool = db.query(Tool).filter(Tool.id == payload.tool_id).first()
+    if not tool:
+        raise HTTPException(status_code=404, detail="Tool not found")
+
+    ts = datetime.fromisoformat(payload.timestamp) if payload.timestamp else datetime.utcnow()
+    action = ToolAction(
+        tool_id=payload.tool_id,
+        user_id=current_user.id,
+        action=payload.action,
+        timestamp=ts,
+    )
+    db.add(action)
+    db.commit()
+    db.refresh(action)
+    return action
+
+
 @router.post("", response_model=ToolResponse, status_code=status.HTTP_201_CREATED)
 def create_tool(
     payload: ToolCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(get_current_user),
 ):
     if payload.serial_number:
         if db.query(Tool).filter(Tool.serial_number == payload.serial_number).first():
             raise HTTPException(status_code=400, detail="Serial number already exists")
+    if payload.marker_id:
+        _assert_marker_unique(db, payload.marker_id)
     tool = Tool(**payload.model_dump())
     db.add(tool)
     db.commit()
@@ -180,7 +219,10 @@ def update_tool(
     tool = db.query(Tool).filter(Tool.id == tool_id).first()
     if not tool:
         raise HTTPException(status_code=404, detail="Tool not found")
-    for field, value in payload.model_dump(exclude_none=True).items():
+    update_data = payload.model_dump(exclude_none=True)
+    if "marker_id" in update_data and update_data["marker_id"]:
+        _assert_marker_unique(db, update_data["marker_id"], exclude_tool_id=tool_id)
+    for field, value in update_data.items():
         setattr(tool, field, value)
     db.commit()
     db.refresh(tool)
@@ -191,7 +233,7 @@ def update_tool(
 def delete_tool(
     tool_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(get_current_user),
 ):
     tool = db.query(Tool).filter(Tool.id == tool_id).first()
     if not tool:

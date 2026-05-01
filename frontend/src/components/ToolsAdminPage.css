@@ -1,0 +1,270 @@
+.tools-admin-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.tools-admin-hero {
+  background: linear-gradient(140deg, #151515 0%, #1d1d1d 70%);
+  border: 1px solid #2b2b2b;
+  border-radius: 4px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.tools-admin-hero h1 {
+  margin: 0 0 0.6rem;
+  color: #f8fafc;
+}
+
+.tools-admin-hero p {
+  margin: 0;
+  color: #b3b3b3;
+  line-height: 1.5;
+}
+
+.tools-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.tool-panel {
+  border: 1px solid #2b2b2b;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #171717 0%, #121212 100%);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+  padding: 1.2rem;
+}
+
+.tool-panel h2 {
+  margin: 0 0 1rem;
+  color: #f8fafc;
+  font-size: 1.2rem;
+}
+
+.tool-help-text {
+  margin: 0 0 0.8rem;
+  color: #b3b3b3;
+}
+
+.tool-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.tool-form label {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
+
+.tool-form input,
+.tool-form select {
+  width: 100%;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  background: #111;
+  color: #e2e8f0;
+  padding: 0.62rem 0.7rem;
+  box-sizing: border-box;
+}
+
+.tool-form select option {
+  background: #1a1a1a;
+  color: #e2e8f0;
+}
+
+.tool-btn {
+  border: none;
+  border-radius: 4px;
+  padding: 0.66rem 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: #241b10;
+  color: #f59e0b;
+  box-shadow: inset 0 0 0 1px #7c4a03;
+}
+
+.tool-btn:hover {
+  background: #2d2113;
+  color: #fb923c;
+}
+
+.tool-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tool-btn-secondary {
+  background: #1f2937;
+  color: #cbd5e1;
+  box-shadow: inset 0 0 0 1px #374151;
+}
+
+.tool-btn-secondary:hover {
+  background: #263244;
+  color: #f8fafc;
+}
+
+.tool-btn-danger {
+  background: #2d0f0f;
+  color: #fca5a5;
+  box-shadow: inset 0 0 0 1px #7f1d1d;
+}
+
+.tool-btn-danger:hover {
+  background: #3b1212;
+  color: #fecaca;
+}
+
+.tool-feedback {
+  margin-bottom: 1rem;
+}
+
+.tool-error,
+.tool-success {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: 4px;
+}
+
+.tool-error {
+  background: rgba(127, 29, 29, 0.35);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  color: #fecaca;
+}
+
+.tool-success {
+  background: rgba(6, 78, 59, 0.35);
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  color: #a7f3d0;
+}
+
+.tool-list-panel {
+  margin-bottom: 1rem;
+}
+
+.tool-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.tool-list-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.tool-table-wrap {
+  margin-top: 0.9rem;
+  overflow-x: auto;
+}
+
+.tool-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tool-table th,
+.tool-table td {
+  border-bottom: 1px solid #2e2e2e;
+  text-align: left;
+  padding: 0.62rem;
+  font-size: 0.92rem;
+}
+
+.tool-table th {
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+.tool-table td {
+  color: #e2e8f0;
+}
+
+.tool-table td code {
+  color: #fb923c;
+  font-size: 0.85rem;
+}
+
+.tool-table-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+/* ArUco live preview in the form */
+.aruco-live-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.75rem;
+  border: 1px solid #7c4a03;
+  border-radius: 3px;
+  background: #1a1208;
+}
+
+.aruco-live-preview img {
+  width: 100px;
+  height: 100px;
+  image-rendering: pixelated;
+  display: block;
+}
+
+.aruco-live-preview-label {
+  font-size: 0.8rem;
+  color: #f59e0b;
+  font-weight: 700;
+}
+
+/* ArUco pattern image in the table */
+.aruco-table-img {
+  width: 48px;
+  height: 48px;
+  image-rendering: pixelated;
+  border: 1px solid #3a3a3a;
+  border-radius: 2px;
+  display: block;
+}
+
+/* ArUco badge in the table */
+.aruco-table-badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid #7c4a03;
+  border-radius: 3px;
+  background: #1a1208;
+  color: #f59e0b;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+/* How-it-works steps */
+.aruco-steps {
+  padding-left: 1.2rem;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.aruco-steps li {
+  color: #b3b3b3;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+  .tool-table th,
+  .tool-table td {
+    padding: 0.5rem;
+    font-size: 0.85rem;
+  }
+}

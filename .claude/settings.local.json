@@ -3,7 +3,11 @@
     "allow": [
       "Bash(python -m pip --version)",
       "Bash(py --version)",
-      "Bash(py -m pip --version)"
+      "Bash(py -m pip --version)",
+      "Bash(Get-ChildItem -Recurse -Path \"C:\\\\Users\\\\Zarrar\\\\Documents\\\\University\\\\AR system\\\\ARSupportSystem\" -Directory)",
+      "Bash(Select-Object FullName)",
+      "PowerShell(head -30)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Zarrar\\\\Documents\\\\University\\\\AR system\\\\ARSupportSystem\\\\frontend\" -Recurse | Where-Object {$_.PSIsContainer -eq $false} | Select-Object FullName | Sort-Object FullName)"
     ]
   }
 }

@@ -8,6 +8,8 @@ class ToolCreate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     name: str
+    marker_id: Optional[str] = None
+    marker_image: Optional[str] = None
     category: ToolCategory = ToolCategory.other
     description: Optional[str] = None
     serial_number: Optional[str] = None
@@ -17,6 +19,8 @@ class ToolUpdate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     name: Optional[str] = None
+    marker_id: Optional[str] = None
+    marker_image: Optional[str] = None
     category: Optional[ToolCategory] = None
     description: Optional[str] = None
     is_available: Optional[bool] = None
@@ -27,11 +31,31 @@ class ToolResponse(BaseModel):
 
     id: int
     name: str
+    marker_id: Optional[str]
+    marker_image: Optional[str]
     category: ToolCategory
     description: Optional[str]
     serial_number: Optional[str]
     is_available: bool
     created_at: datetime
+
+
+class ToolActionCreate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    tool_id: int
+    action: str
+    timestamp: Optional[str] = None
+
+
+class ToolActionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    tool_id: int
+    user_id: int
+    action: str
+    timestamp: datetime
 
 
 

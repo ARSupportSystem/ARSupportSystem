@@ -19,10 +19,23 @@ from app.core.database import get_db
 from app.models.user import User, UserRole
 from app.models.fault import Fault, FaultStatus, FaultSeverity, FaultLocation
 from app.models.marker import Marker
+from app.models.tool import Tool
 from app.schemas.fault import FaultCreate, FaultUpdate, FaultStatusUpdate, FaultResponse
 from app.api.deps import get_current_user, require_admin
 
 router = APIRouter(prefix="/faults", tags=["faults"])
+
+
+def _assert_marker_unique(db: Session, marker_id: str, exclude_fault_id: int = None) -> None:
+    """Raise 400 if marker_id is already assigned to another fault or any tool."""
+    fault_q = db.query(Fault).filter(Fault.ar_marker_id == marker_id)
+    if exclude_fault_id:
+        fault_q = fault_q.filter(Fault.id != exclude_fault_id)
+    if fault_q.first():
+        raise HTTPException(status_code=400, detail="Marker is already assigned to another fault.")
+
+    if db.query(Tool).filter(Tool.marker_id == marker_id).first():
+        raise HTTPException(status_code=400, detail="Marker is already assigned to a tool.")
 
 
 def _distance_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -88,6 +101,7 @@ def create_fault(
             raise HTTPException(status_code=400, detail="Marker is not registered. Ask admin to create it first.")
         if not marker.is_active:
             raise HTTPException(status_code=400, detail="Marker is inactive and cannot be used for fault reports.")
+        _assert_marker_unique(db, payload.ar_marker_id)
 
         if not payload.location_detail and marker.location_detail:
             payload.location_detail = marker.location_detail
@@ -145,6 +159,7 @@ def update_fault(
             raise HTTPException(status_code=400, detail="Marker is not registered. Ask admin to create it first.")
         if not marker.is_active:
             raise HTTPException(status_code=400, detail="Marker is inactive and cannot be used for fault reports.")
+        _assert_marker_unique(db, payload.ar_marker_id, exclude_fault_id=fault_id)
 
     for field, value in payload.model_dump(exclude_none=True).items():
         setattr(fault, field, value)

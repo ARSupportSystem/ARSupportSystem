@@ -161,8 +161,14 @@ const monitorCameraVideo = ({ onReady, onTimeout }) => {
 window.addEventListener('load', async () => {
   sendStatus(`AR.js initializing (${modeText})...`);
 
+  const isEmbedded = params.get('embedded') === '1';
+  const toolbar = document.getElementById('toolbar');
+  if (isEmbedded && toolbar) {
+    toolbar.style.display = 'none';
+  }
+
   const backButton = document.getElementById('backBtn');
-  if (backButton) {
+  if (backButton && !isEmbedded) {
     backButton.addEventListener('click', () => window.history.back());
   }
 
@@ -170,49 +176,88 @@ window.addEventListener('load', async () => {
   let loadedMarkersCount = 0;
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/markers?active_only=true`, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
-    });
-
-    if (response.ok) {
-      const markers = await response.json();
-      const validMarkers = markers.filter((m) => m.image_url);
-      
-      validMarkers.forEach((marker) => {
-        const markerEl = document.createElement('a-marker');
-        markerEl.setAttribute('id', `marker-${marker.marker_id}`);
-        markerEl.setAttribute('preset', 'custom');
-        // Using the image_url as pattern. AFrame AR.js supports custom patterns via URL.
-        const url = marker.image_url.startsWith('http') 
-          ? marker.image_url 
-          : `${API_BASE_URL}${marker.image_url}`;
-        markerEl.setAttribute('type', 'pattern');
-        markerEl.setAttribute('url', url);
-
-        const box = document.createElement('a-box');
-        box.setAttribute('position', '0 0.5 0');
-        box.setAttribute('material', 'color: #00ffff; opacity: 0.5');
-        box.setAttribute('depth', '1');
-        box.setAttribute('height', '1');
-        box.setAttribute('width', '1');
-
-        const text = document.createElement('a-text');
-        text.setAttribute('value', marker.marker_id);
-        text.setAttribute('align', 'center');
-        text.setAttribute('position', '0 1.2 0');
-        text.setAttribute('color', '#00ffff');
-        text.setAttribute('scale', '1.5 1.5 1.5');
-
-        markerEl.appendChild(box);
-        markerEl.appendChild(text);
-        sceneEl.appendChild(markerEl);
-
-        wireMarker(`marker-${marker.marker_id}`, marker.marker_id, marker.marker_id);
-        loadedMarkersCount++;
+    if (mode === 'tools') {
+      // Tools mode — load tools from API and create ArUco barcode markers
+      const response = await fetch(`${API_BASE_URL}/api/tools`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${authToken}` },
       });
+
+      if (response.ok) {
+        const tools = await response.json();
+        const validTools = tools.filter((t) => t.marker_id !== null && t.marker_id !== undefined);
+
+        validTools.forEach((tool) => {
+          const markerEl = document.createElement('a-marker');
+          markerEl.setAttribute('id', `tool-marker-${tool.marker_id}`);
+          markerEl.setAttribute('type', 'barcode');
+          markerEl.setAttribute('value', String(tool.marker_id));
+
+          const box = document.createElement('a-box');
+          box.setAttribute('position', '0 0.3 0');
+          box.setAttribute('material', 'color: #00ff88; opacity: 0.6');
+          box.setAttribute('depth', '0.5');
+          box.setAttribute('height', '0.5');
+          box.setAttribute('width', '0.5');
+
+          const text = document.createElement('a-text');
+          text.setAttribute('value', tool.name);
+          text.setAttribute('align', 'center');
+          text.setAttribute('position', '0 0.7 0');
+          text.setAttribute('color', '#00ff88');
+          text.setAttribute('scale', '1.5 1.5 1.5');
+
+          markerEl.appendChild(box);
+          markerEl.appendChild(text);
+          sceneEl.appendChild(markerEl);
+
+          wireMarker(`tool-marker-${tool.marker_id}`, String(tool.marker_id), tool.name);
+          loadedMarkersCount++;
+        });
+      }
+    } else {
+      // Faults mode — load pattern markers from API
+      const response = await fetch(`${API_BASE_URL}/api/markers?active_only=true`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+
+      if (response.ok) {
+        const markers = await response.json();
+        const validMarkers = markers.filter((m) => m.image_url);
+
+        validMarkers.forEach((marker) => {
+          const markerEl = document.createElement('a-marker');
+          markerEl.setAttribute('id', `marker-${marker.marker_id}`);
+          markerEl.setAttribute('preset', 'custom');
+          const url = marker.image_url.startsWith('http')
+            ? marker.image_url
+            : `${API_BASE_URL}${marker.image_url}`;
+          markerEl.setAttribute('type', 'pattern');
+          markerEl.setAttribute('url', url);
+
+          const box = document.createElement('a-box');
+          box.setAttribute('position', '0 0.5 0');
+          box.setAttribute('material', 'color: #00ffff; opacity: 0.5');
+          box.setAttribute('depth', '1');
+          box.setAttribute('height', '1');
+          box.setAttribute('width', '1');
+
+          const text = document.createElement('a-text');
+          text.setAttribute('value', marker.marker_id);
+          text.setAttribute('align', 'center');
+          text.setAttribute('position', '0 1.2 0');
+          text.setAttribute('color', '#00ffff');
+          text.setAttribute('scale', '1.5 1.5 1.5');
+
+          markerEl.appendChild(box);
+          markerEl.appendChild(text);
+          sceneEl.appendChild(markerEl);
+
+          wireMarker(`marker-${marker.marker_id}`, marker.marker_id, marker.marker_id);
+          loadedMarkersCount++;
+        });
+      }
     }
   } catch (err) {
     console.error('Failed to load markers for AR scene', err);

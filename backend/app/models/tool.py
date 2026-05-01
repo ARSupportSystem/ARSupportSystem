@@ -28,11 +28,28 @@ class Tool(Base):
     category = Column(Enum(ToolCategory), default=ToolCategory.other, nullable=False)
     description = Column(Text)
     serial_number = Column(String, unique=True, index=True)
+    marker_id = Column(String, nullable=True, index=True)
+    marker_image = Column(Text, nullable=True)
     is_available = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
     session_items = relationship("ToolSessionItem", back_populates="tool")
+    actions = relationship("ToolAction", back_populates="tool", cascade="all, delete-orphan")
+
+
+class ToolAction(Base):
+    """Logs every AR tool check action — confirmed, checkin, checkout, or missing."""
+    __tablename__ = "tool_actions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tool_id = Column(Integer, ForeignKey("tools.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    action = Column(String, nullable=False)
+    timestamp = Column(DateTime(timezone=True), nullable=False)
+
+    tool = relationship("Tool", back_populates="actions")
+    user = relationship("User")
 
 
 class ToolSession(Base):

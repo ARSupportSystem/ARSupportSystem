@@ -19,6 +19,21 @@ logger = logging.getLogger(__name__)
 import app.models  # noqa: F401 — ensures all models are registered with Base
 Base.metadata.create_all(bind=engine)
 
+# Safe migration: add marker_id column to tools table if it doesn't exist yet
+from sqlalchemy import text as _text
+with engine.connect() as _conn:
+    try:
+        _conn.execute(_text("ALTER TABLE tools ADD COLUMN marker_id TEXT"))
+        _conn.commit()
+    except Exception:
+        pass  # Column already exists — safe to ignore
+
+    try:
+        _conn.execute(_text("ALTER TABLE tools ADD COLUMN marker_image TEXT"))
+        _conn.commit()
+    except Exception:
+        pass  # Column already exists — safe to ignore
+
 app = FastAPI(
     title=settings.APP_NAME,
     description="AR-Enhanced Maintenance Support System for Public Transport",

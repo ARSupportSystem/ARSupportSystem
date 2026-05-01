@@ -18,6 +18,10 @@ const HomePage = ({ currentUser }) => {
     navigate('/markers');
   };
 
+  const handleManageTools = () => {
+    navigate('/tools-admin');
+  };
+
   return (
     <div className="homepage">
       <section className="hero">
@@ -42,6 +46,13 @@ const HomePage = ({ currentUser }) => {
         <div className="feature">
           <h2>Secure Collaboration</h2>
           <p>Share information securely between authorized users.</p>
+        </div>
+        <div className="feature">
+          <h2>Tool Management</h2>
+          <p>Register tools, assign AR markers, and manage your tool inventory.</p>
+          <button className="ar-button" onClick={handleManageTools}>
+            Manage Tools
+          </button>
         </div>
         {isAdmin && (
           <div className="feature">

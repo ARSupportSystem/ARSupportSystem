@@ -15,6 +15,17 @@ async function parseResponse(response) {
   return payload;
 }
 
+export async function listFaultsRequest(token) {
+  const response = await fetch(`${API_BASE_URL}/api/faults`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return parseResponse(response);
+}
+
 export async function getFaultByMarkerRequest(token, markerId) {
   const response = await fetch(`${API_BASE_URL}/api/faults/marker/${encodeURIComponent(markerId)}`, {
     method: 'GET',
