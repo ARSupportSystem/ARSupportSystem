@@ -26,6 +26,7 @@ class User(Base):
     # Relationships
     reported_faults = relationship("Fault", back_populates="reporter", foreign_keys="Fault.reported_by_id")
     assigned_faults = relationship("Fault", back_populates="assignee", foreign_keys="Fault.assigned_to_id")
+    tools = relationship("Tool", back_populates="owner")
     tool_sessions = relationship("ToolSession", back_populates="technician")
     annotations = relationship("ARAnnotation", back_populates="creator")
     audit_logs = relationship("AuditLog", back_populates="user")

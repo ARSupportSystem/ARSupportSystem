@@ -4,6 +4,7 @@ const params = new URLSearchParams(window.location.search);
 const mode = params.get('mode') || 'faults';
 const modeText = mode === 'tools' ? 'Tools mode' : 'Faults mode';
 const API_BASE_URL = params.get('apiBase') || 'http://localhost:8000';
+const ownerId = params.get('ownerId') || '';
 const authToken = localStorage.getItem('authToken') || '';
 
 const escapeHtml = (value) => String(value)
@@ -46,6 +47,20 @@ const setFaultDetails = (content, isHtml = false) => {
 const renderFaultError = (markerId, detail) => {
   setFaultDetails(
     `<p class="fault-card-title">Marker ${escapeHtml(markerId)}</p><p class="fault-error">${escapeHtml(detail)}</p>`,
+    true,
+  );
+};
+
+const renderToolDetails = (tool) => {
+  setFaultDetails(
+    `
+      <p class="fault-card-title">${escapeHtml(tool.name)}</p>
+      <div class="fault-meta">
+        <span class="fault-chip">tool marker: ${escapeHtml(tool.marker_id)}</span>
+        <span class="fault-chip">${tool.is_available ? 'available' : 'checked out'}</span>
+      </div>
+      ${tool.description ? `<p class="fault-row">${escapeHtml(tool.description)}</p>` : ''}
+    `,
     true,
   );
 };
@@ -103,7 +118,7 @@ const fetchFaultByMarker = async (markerId) => {
   }
 };
 
-const wireMarker = (elementId, markerId, label) => {
+const wireMarker = (elementId, markerId, label, { onFound } = {}) => {
   const markerElement = document.getElementById(elementId);
   if (!markerElement) {
     return;
@@ -112,7 +127,11 @@ const wireMarker = (elementId, markerId, label) => {
   markerElement.addEventListener('markerFound', () => {
     sendStatus(`${label} marker found.`);
     notifyMarkerFound(markerId);
-    fetchFaultByMarker(markerId);
+    if (onFound) {
+      onFound();
+    } else {
+      fetchFaultByMarker(markerId);
+    }
   });
 
   markerElement.addEventListener('markerLost', () => {
@@ -177,21 +196,31 @@ window.addEventListener('load', async () => {
 
   try {
     if (mode === 'tools') {
-      // Tools mode — load tools from API and create ArUco barcode markers
-      const response = await fetch(`${API_BASE_URL}/api/tools`, {
+      // Tools mode - load tools from API and create AR.js 3x3 barcode markers
+      const toolParams = new URLSearchParams();
+      if (ownerId) {
+        toolParams.set('owner_id', ownerId);
+      }
+      const toolQuery = toolParams.toString();
+      const response = await fetch(`${API_BASE_URL}/api/tools${toolQuery ? `?${toolQuery}` : ''}`, {
         method: 'GET',
         headers: { Authorization: `Bearer ${authToken}` },
       });
 
       if (response.ok) {
         const tools = await response.json();
-        const validTools = tools.filter((t) => t.marker_id !== null && t.marker_id !== undefined);
+        const validTools = tools.filter((t) => {
+          const markerValue = Number.parseInt(t.marker_id, 10);
+          return Number.isInteger(markerValue) && markerValue >= 0 && markerValue <= 63;
+        });
 
         validTools.forEach((tool) => {
           const markerEl = document.createElement('a-marker');
           markerEl.setAttribute('id', `tool-marker-${tool.marker_id}`);
           markerEl.setAttribute('type', 'barcode');
           markerEl.setAttribute('value', String(tool.marker_id));
+          markerEl.setAttribute('emitevents', 'true');
+          markerEl.setAttribute('smooth', 'true');
 
           const box = document.createElement('a-box');
           box.setAttribute('position', '0 0.3 0');
@@ -211,9 +240,13 @@ window.addEventListener('load', async () => {
           markerEl.appendChild(text);
           sceneEl.appendChild(markerEl);
 
-          wireMarker(`tool-marker-${tool.marker_id}`, String(tool.marker_id), tool.name);
+          wireMarker(`tool-marker-${tool.marker_id}`, String(tool.marker_id), tool.name, {
+            onFound: () => renderToolDetails(tool),
+          });
           loadedMarkersCount++;
         });
+      } else {
+        sendStatus(`Unable to load tools (${response.status}). Sign in and check the API URL.`);
       }
     } else {
       // Faults mode — load pattern markers from API
@@ -235,6 +268,8 @@ window.addEventListener('load', async () => {
             : `${API_BASE_URL}${marker.image_url}`;
           markerEl.setAttribute('type', 'pattern');
           markerEl.setAttribute('url', url);
+          markerEl.setAttribute('emitevents', 'true');
+          markerEl.setAttribute('smooth', 'true');
 
           const box = document.createElement('a-box');
           box.setAttribute('position', '0 0.5 0');
@@ -257,6 +292,8 @@ window.addEventListener('load', async () => {
           wireMarker(`marker-${marker.marker_id}`, marker.marker_id, marker.marker_id);
           loadedMarkersCount++;
         });
+      } else {
+        sendStatus(`Unable to load fault markers (${response.status}). Sign in and check the API URL.`);
       }
     }
   } catch (err) {

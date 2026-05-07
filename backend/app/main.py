@@ -34,6 +34,12 @@ with engine.connect() as _conn:
     except Exception:
         pass  # Column already exists — safe to ignore
 
+    try:
+        _conn.execute(_text("ALTER TABLE tools ADD COLUMN owner_id INTEGER"))
+        _conn.commit()
+    except Exception:
+        pass  # Column already exists - safe to ignore
+
 app = FastAPI(
     title=settings.APP_NAME,
     description="AR-Enhanced Maintenance Support System for Public Transport",

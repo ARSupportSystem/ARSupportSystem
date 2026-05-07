@@ -8,6 +8,7 @@ class ToolCreate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     name: str
+    owner_id: Optional[int] = None
     marker_id: Optional[str] = None
     marker_image: Optional[str] = None
     category: ToolCategory = ToolCategory.other
@@ -19,6 +20,7 @@ class ToolUpdate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     name: Optional[str] = None
+    owner_id: Optional[int] = None
     marker_id: Optional[str] = None
     marker_image: Optional[str] = None
     category: Optional[ToolCategory] = None
@@ -31,6 +33,7 @@ class ToolResponse(BaseModel):
 
     id: int
     name: str
+    owner_id: Optional[int]
     marker_id: Optional[str]
     marker_image: Optional[str]
     category: ToolCategory

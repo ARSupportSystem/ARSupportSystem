@@ -22,8 +22,14 @@ function authHeaders(token) {
   };
 }
 
-export async function listToolsRequest(token) {
-  const response = await fetch(`${API_BASE_URL}/api/tools`, {
+export async function listToolsRequest(token, filters = {}) {
+  const params = new URLSearchParams();
+  if (filters.owner_id !== undefined && filters.owner_id !== null && filters.owner_id !== '') {
+    params.set('owner_id', String(filters.owner_id));
+  }
+
+  const query = params.toString();
+  const response = await fetch(`${API_BASE_URL}/api/tools${query ? `?${query}` : ''}`, {
     method: 'GET',
     headers: authHeaders(token),
   });
@@ -31,24 +37,28 @@ export async function listToolsRequest(token) {
   return parseResponse(response);
 }
 
-export async function createToolRequest(token, { name, marker_id, marker_image }) {
+export async function createToolRequest(token, { name, marker_id, marker_image, owner_id }) {
   const response = await fetch(`${API_BASE_URL}/api/tools`, {
     method: 'POST',
     headers: authHeaders(token),
-    body: JSON.stringify({ name, marker_id, marker_image }),
+    body: JSON.stringify({ name, marker_id, marker_image, owner_id }),
+  });
+
+  return parseResponse(response);
+}
+
+export async function updateToolRequest(token, toolId, payload) {
+  const response = await fetch(`${API_BASE_URL}/api/tools/${toolId}`, {
+    method: 'PUT',
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
   });
 
   return parseResponse(response);
 }
 
 export async function updateToolImageRequest(token, toolId, marker_image) {
-  const response = await fetch(`${API_BASE_URL}/api/tools/${toolId}`, {
-    method: 'PUT',
-    headers: authHeaders(token),
-    body: JSON.stringify({ marker_image }),
-  });
-
-  return parseResponse(response);
+  return updateToolRequest(token, toolId, { marker_image });
 }
 
 export async function deleteToolRequest(token, toolId) {

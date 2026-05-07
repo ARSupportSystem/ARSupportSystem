@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { createToolRequest, deleteToolRequest, listToolsRequest, updateToolImageRequest } from '../services/toolsApi';
+import { createToolRequest, deleteToolRequest, listToolsRequest, updateToolImageRequest, updateToolRequest } from '../services/toolsApi';
+import { listUsersRequest } from '../services/usersApi';
 import { generateArucoDataUrl } from '../utils/arucoGenerator';
 import './ToolsAdminPage.css';
 
-// Valid ArUco values for AR.js matrixCodeType 3x3 (0–49)
-const ARUCO_RANGE = Array.from({ length: 50 }, (_, i) => i);
+// Valid AR.js 3x3 barcode marker values (0-63)
+const ARUCO_RANGE = Array.from({ length: 64 }, (_, i) => i);
 
 const escapeHtml = (value) => String(value)
   .replaceAll('&', '&amp;')
@@ -13,16 +14,24 @@ const escapeHtml = (value) => String(value)
   .replaceAll('"', '&quot;')
   .replaceAll("'", '&#039;');
 
-const ToolsAdminPage = () => {
+const ToolsAdminPage = ({ currentUser }) => {
   const token = useMemo(() => localStorage.getItem('authToken') || '', []);
+  const isAdmin = currentUser?.role === 'admin';
   const [tools, setTools] = useState([]);
+  const [users, setUsers] = useState([]);
   const [usedValues, setUsedValues] = useState(new Set());
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBackfilling, setIsBackfilling] = useState(false);
-  const [toolForm, setToolForm] = useState({ name: '', marker_id: '' });
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [toolForm, setToolForm] = useState({ name: '', marker_id: '', owner_id: '' });
+
+  const userById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
+  const ownerOptions = useMemo(() => (
+    users.filter((user) => user.is_active)
+  ), [users]);
 
   const refreshTools = useCallback(async () => {
     setLoading(true);
@@ -30,18 +39,37 @@ const ToolsAdminPage = () => {
     try {
       const data = await listToolsRequest(token);
       setTools(data);
-      setUsedValues(new Set(data.map((t) => String(t.marker_id)).filter(Boolean)));
+      const ownerIdForMarkerPool = isAdmin && toolForm.owner_id
+        ? Number.parseInt(toolForm.owner_id, 10)
+        : currentUser?.id;
+      setUsedValues(new Set(
+        data
+          .filter((t) => !ownerIdForMarkerPool || t.owner_id === ownerIdForMarkerPool)
+          .map((t) => String(t.marker_id))
+          .filter(Boolean),
+      ));
     } catch (error) {
       const detail = error instanceof Error ? error.message : 'Unable to load tools';
       setErrorMessage(detail);
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [currentUser?.id, isAdmin, token, toolForm.owner_id]);
 
   useEffect(() => {
     refreshTools();
   }, [refreshTools]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    listUsersRequest(token)
+      .then((payload) => setUsers(payload.items || []))
+      .catch((error) => {
+        const detail = error instanceof Error ? error.message : 'Unable to load users';
+        setErrorMessage(detail);
+      });
+  }, [isAdmin, token]);
 
   const handleCreate = async (event) => {
     event.preventDefault();
@@ -58,6 +86,11 @@ const ToolsAdminPage = () => {
       return;
     }
 
+    if (isAdmin && !toolForm.owner_id) {
+      setErrorMessage('Please choose which user owns this tool.');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       const markerId = toolForm.marker_id;
@@ -66,9 +99,10 @@ const ToolsAdminPage = () => {
         name: toolForm.name.trim(),
         marker_id: markerId,
         marker_image: markerImage,
+        owner_id: isAdmin ? Number.parseInt(toolForm.owner_id, 10) : undefined,
       });
       setSuccessMessage(`Tool "${toolForm.name.trim()}" created with ArUco marker #${markerId}.`);
-      setToolForm({ name: '', marker_id: '' });
+      setToolForm({ name: '', marker_id: '', owner_id: isAdmin ? toolForm.owner_id : '' });
       await refreshTools();
     } catch (error) {
       const detail = error instanceof Error ? error.message : 'Failed to create tool';
@@ -115,6 +149,49 @@ const ToolsAdminPage = () => {
     }
   };
 
+  const handleAssignOwner = async (tool, ownerId) => {
+    setErrorMessage('');
+    setSuccessMessage('');
+    try {
+      const nextOwnerId = Number.parseInt(ownerId, 10);
+      await updateToolRequest(token, tool.id, { owner_id: nextOwnerId });
+      const ownerName = userById.get(nextOwnerId)?.full_name || `User #${nextOwnerId}`;
+      setSuccessMessage(`Tool "${tool.name}" assigned to ${ownerName}.`);
+      await refreshTools();
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'Failed to assign tool';
+      setErrorMessage(detail);
+    }
+  };
+
+  const handleRegenerateAll = async () => {
+    const markedTools = tools.filter((t) => {
+      const markerValue = Number.parseInt(t.marker_id, 10);
+      return Number.isInteger(markerValue) && markerValue >= 0 && markerValue <= 63;
+    });
+    if (markedTools.length === 0) {
+      setErrorMessage('No marked tools found to regenerate.');
+      return;
+    }
+
+    setIsRegenerating(true);
+    setErrorMessage('');
+    setSuccessMessage('');
+    try {
+      for (const tool of markedTools) {
+        const markerImage = generateArucoDataUrl(parseInt(tool.marker_id, 10), { cellSize: 60 });
+        await updateToolImageRequest(token, tool.id, markerImage);
+      }
+      setSuccessMessage(`Regenerated markers for ${markedTools.length} tool${markedTools.length !== 1 ? 's' : ''}.`);
+      await refreshTools();
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'Failed to regenerate markers';
+      setErrorMessage(detail);
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
   const handlePrintLabel = (tool) => {
     const markerImageSrc = tool.marker_image
       || generateArucoDataUrl(parseInt(tool.marker_id, 10), { cellSize: 60 });
@@ -142,7 +219,7 @@ const ToolsAdminPage = () => {
           <p class="tool-name">${escapeHtml(tool.name)}</p>
           <img class="marker-img" src="${markerImageSrc}" alt="ArUco marker #${escapeHtml(String(tool.marker_id))}" />
           <p class="aruco-label">ArUco ID</p>
-          <p class="aruco-value">#${escapeHtml(String(tool.marker_id))} — 3×3 matrix</p>
+          <p class="aruco-value">#${escapeHtml(String(tool.marker_id))} - 3x3 matrix</p>
           <p class="instructions">Scan with AR camera to look up tool details.</p>
         </div>
         <script>window.onload = () => window.print();</script>
@@ -172,7 +249,9 @@ const ToolsAdminPage = () => {
       <section className="tools-admin-hero">
         <h1>Tool Management</h1>
         <p>
-          Register tools and assign each one a unique ArUco marker number. The marker pattern is generated automatically — print it, attach it to the tool, and technicians can scan it during tool checks.
+          {isAdmin
+            ? 'Manage every engineer toolkit, regenerate labels, and remove tools when needed.'
+            : 'Build your personal toolkit before each job, print labels, and scan your own tools during AR checks.'}
         </p>
       </section>
 
@@ -180,7 +259,7 @@ const ToolsAdminPage = () => {
         <article className="tool-panel">
           <h2>Add New Tool</h2>
           <p className="tool-help-text">
-            Choose an available ArUco marker number (0–49). The marker image is generated automatically — no external tool needed.
+            Choose an available marker number for your own toolkit (0-63). The marker image is generated automatically - no external tool needed.
           </p>
           <form onSubmit={handleCreate} className="tool-form">
             <label htmlFor="tool-name">Tool Name</label>
@@ -192,11 +271,30 @@ const ToolsAdminPage = () => {
               onChange={(event) => setToolForm({ ...toolForm, name: event.target.value })}
             />
 
+            {isAdmin && (
+              <>
+                <label htmlFor="tool-owner">Assign To</label>
+                <select
+                  id="tool-owner"
+                  value={toolForm.owner_id}
+                  onChange={(event) => setToolForm({ ...toolForm, owner_id: event.target.value, marker_id: '' })}
+                >
+                  <option value="">Select a user</option>
+                  {ownerOptions.map((user) => (
+                    <option key={user.id} value={String(user.id)}>
+                      {user.full_name} ({user.role})
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+
             <label htmlFor="tool-marker">ArUco Marker Number</label>
             <select
               id="tool-marker"
               value={toolForm.marker_id}
               onChange={(event) => setToolForm({ ...toolForm, marker_id: event.target.value })}
+              disabled={isAdmin && !toolForm.owner_id}
             >
               <option value="">— Select a number —</option>
               {ARUCO_RANGE.map((n) => {
@@ -225,7 +323,7 @@ const ToolsAdminPage = () => {
         <article className="tool-panel">
           <h2>How ArUco Markers Work</h2>
           <p className="tool-help-text">
-            ArUco markers are black-and-white square patterns. Each number (0–49) maps to a unique scannable pattern — generated right here in the app, no external tool required.
+            ArUco markers are black-and-white square patterns. Each number (0-63) maps to a unique scannable pattern generated right here in the app.
           </p>
           <ol className="aruco-steps">
             <li>Add a tool and select an available marker number above.</li>
@@ -246,7 +344,7 @@ const ToolsAdminPage = () => {
 
       <section className="tool-panel tool-list-panel">
         <div className="tool-list-header">
-          <h2>Registered Tools</h2>
+          <h2>{isAdmin ? 'All Registered Tools' : 'My Toolkit'}</h2>
           <div className="tool-list-actions">
             {missingCount > 0 && (
               <button
@@ -260,6 +358,14 @@ const ToolsAdminPage = () => {
             )}
             <button type="button" className="tool-btn tool-btn-secondary" onClick={refreshTools}>
               Refresh
+            </button>
+            <button
+              type="button"
+              className="tool-btn tool-btn-secondary"
+              onClick={handleRegenerateAll}
+              disabled={isRegenerating}
+            >
+              {isRegenerating ? 'Regenerating...' : 'Regenerate All Markers'}
             </button>
           </div>
         </div>
@@ -276,6 +382,7 @@ const ToolsAdminPage = () => {
                   <th>Tool Name</th>
                   <th>Marker</th>
                   <th>ArUco ID</th>
+                  {isAdmin && <th>Owner</th>}
                   <th>Created</th>
                   <th>Actions</th>
                 </tr>
@@ -302,6 +409,22 @@ const ToolsAdminPage = () => {
                         ? <span className="aruco-table-badge">#{tool.marker_id}</span>
                         : <span style={{ color: '#6b7280' }}>—</span>}
                     </td>
+                    {isAdmin && (
+                      <td>
+                        <select
+                          className="tool-owner-select"
+                          value={tool.owner_id || ''}
+                          onChange={(event) => handleAssignOwner(tool, event.target.value)}
+                        >
+                          <option value="" disabled>Unassigned</option>
+                          {ownerOptions.map((user) => (
+                            <option key={user.id} value={String(user.id)}>
+                              {user.full_name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                    )}
                     <td>{tool.created_at ? new Date(tool.created_at).toLocaleDateString() : '—'}</td>
                     <td className="tool-table-actions">
                       {tool.marker_id !== null && tool.marker_id !== undefined && (

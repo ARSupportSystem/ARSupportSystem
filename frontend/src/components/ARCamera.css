@@ -252,6 +252,14 @@
   margin-bottom: 0.75rem;
 }
 
+.detected-tool-panel {
+  background: #101010;
+  border: 1px solid #065f46;
+  border-radius: 3px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.9rem;
+}
+
 .tool-scan-instruction {
   margin: 0 0 0.2rem;
   font-size: 0.78rem;

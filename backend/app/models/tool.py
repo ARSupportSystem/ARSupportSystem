@@ -30,10 +30,12 @@ class Tool(Base):
     serial_number = Column(String, unique=True, index=True)
     marker_id = Column(String, nullable=True, index=True)
     marker_image = Column(Text, nullable=True)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     is_available = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
+    owner = relationship("User", back_populates="tools")
     session_items = relationship("ToolSessionItem", back_populates="tool")
     actions = relationship("ToolAction", back_populates="tool", cascade="all, delete-orphan")
 

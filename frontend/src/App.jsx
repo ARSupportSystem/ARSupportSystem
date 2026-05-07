@@ -73,7 +73,7 @@ function AppRoutes({ isAuthenticated, isReady, currentUser, onLogin, isSubmittin
             path="/faults"
             element={
               <ProtectedRoute isAuthenticated={isAuthenticated} isReady={isReady}>
-                <ARCamera />
+                <ARCamera currentUser={currentUser} />
               </ProtectedRoute>
             }
           />
@@ -81,7 +81,7 @@ function AppRoutes({ isAuthenticated, isReady, currentUser, onLogin, isSubmittin
             path="/tools"
             element={
               <ProtectedRoute isAuthenticated={isAuthenticated} isReady={isReady}>
-                <ARCamera />
+                <ARCamera currentUser={currentUser} />
               </ProtectedRoute>
             }
           />
@@ -105,7 +105,7 @@ function AppRoutes({ isAuthenticated, isReady, currentUser, onLogin, isSubmittin
             path="/tools-admin"
             element={
               <ProtectedRoute isAuthenticated={isAuthenticated} isReady={isReady}>
-                <ToolsAdminPage />
+                <ToolsAdminPage currentUser={currentUser} />
               </ProtectedRoute>
             }
           />

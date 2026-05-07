@@ -1,10 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getFaultByMarkerRequest } from '../services/faultsApi';
 import { listToolsRequest, logToolActionRequest } from '../services/toolsApi';
 import './ARCamera.css';
 
-const ARCamera = () => {
+const TOOL_SCAN_COOLDOWN_MS = 2000;
+
+const ARCamera = ({ currentUser }) => {
   const { pathname } = useLocation();
   const isToolsPage = pathname === '/tools';
   const token = localStorage.getItem('authToken') || '';
@@ -20,23 +22,37 @@ const ARCamera = () => {
 
   // Tool checklist state
   const [tools, setTools] = useState([]);
+  const [detectedTool, setDetectedTool] = useState(null);
   const [checklistActive, setChecklistActive] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [confirmed, setConfirmed] = useState([]);
   const [scanWarning, setScanWarning] = useState('');
+  const scanCooldownUntilRef = useRef(0);
+  const scanCooldownTimerRef = useRef(null);
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+  const toolkitOwnerId = currentUser?.id || '';
 
   // embedded=1 tells the AR.js page to hide its back button
   const arSceneUrl = useMemo(
-    () => `/arjs/index.html?mode=${isToolsPage ? 'tools' : 'faults'}&apiBase=${encodeURIComponent(apiBaseUrl)}&embedded=1`,
-    [apiBaseUrl, isToolsPage],
+    () => {
+      const searchParams = new URLSearchParams({
+        mode: isToolsPage ? 'tools' : 'faults',
+        apiBase: apiBaseUrl,
+        embedded: '1',
+      });
+      if (isToolsPage && toolkitOwnerId) {
+        searchParams.set('ownerId', String(toolkitOwnerId));
+      }
+      return `/arjs/index.html?${searchParams.toString()}`;
+    },
+    [apiBaseUrl, isToolsPage, toolkitOwnerId],
   );
 
   const pageContent = isToolsPage
     ? {
         title: 'Tools — AR Workspace',
-        subtitle: 'Point the camera at a tool\'s ArUco marker to scan it.',
+        subtitle: 'Point the camera at a marker from your assigned toolkit.',
       }
     : {
         title: 'Faults — AR Detection',
@@ -46,10 +62,19 @@ const ARCamera = () => {
   // Load tools when in tools mode
   useEffect(() => {
     if (!isToolsPage) return;
-    listToolsRequest(token)
-      .then((data) => setTools(data))
+    listToolsRequest(token, { owner_id: toolkitOwnerId })
+      .then((data) => {
+        const scannableTools = data.filter((tool) => {
+          const markerValue = Number.parseInt(tool.marker_id, 10);
+          return Number.isInteger(markerValue) && markerValue >= 0 && markerValue <= 63;
+        });
+        setTools(scannableTools);
+        if (data.length > 0 && scannableTools.length === 0) {
+          setActionMessage('No tools with valid marker IDs found. Add or update tool markers in Tool Management.');
+        }
+      })
       .catch(() => setActionMessage('Could not load tools from the server.'));
-  }, [isToolsPage, token]);
+  }, [isToolsPage, token, toolkitOwnerId]);
 
   const resolveFaultByMarker = useCallback(async (markerId, source = 'AR.js marker') => {
     setArStatus(`${source} detected (${markerId}). Looking up fault...`);
@@ -69,28 +94,83 @@ const ARCamera = () => {
     }
   }, [token]);
 
+  const findToolByMarkerId = useCallback((markerId) => (
+    tools.find((tool) => String(tool.marker_id) === String(markerId))
+  ), [tools]);
+
+  const startToolScanCooldown = useCallback((toolName) => {
+    scanCooldownUntilRef.current = Date.now() + TOOL_SCAN_COOLDOWN_MS;
+
+    if (scanCooldownTimerRef.current) {
+      window.clearTimeout(scanCooldownTimerRef.current);
+    }
+
+    scanCooldownTimerRef.current = window.setTimeout(() => {
+      scanCooldownUntilRef.current = 0;
+      setArStatus(`Ready for next tool after ${toolName}.`);
+    }, TOOL_SCAN_COOLDOWN_MS);
+  }, []);
+
+  useEffect(() => () => {
+    if (scanCooldownTimerRef.current) {
+      window.clearTimeout(scanCooldownTimerRef.current);
+    }
+  }, []);
+
   // Handle tool checklist scan
   const handleToolScan = useCallback(async (markerId) => {
-    if (!checklistActive || currentIndex >= tools.length) return;
+    if (!checklistActive || currentIndex >= tools.length) return false;
 
     const currentTool = tools[currentIndex];
     setScanWarning('');
 
     if (String(markerId) !== String(currentTool.marker_id)) {
       setScanWarning(`Wrong tool scanned. Expected: ${currentTool.name} (marker #${currentTool.marker_id})`);
-      return;
+      return false;
     }
 
     try {
       await logToolActionRequest(token, { tool_id: currentTool.id, action: 'confirmed' });
     } catch {
-      // Non-critical — still advance the checklist
+      // Non-critical: still advance the checklist so the physical count can continue.
     }
 
-    setConfirmed((prev) => [...prev, currentTool.id]);
+    setConfirmed((prev) => (prev.includes(currentTool.id) ? prev : [...prev, currentTool.id]));
     setActionMessage(`${currentTool.name} confirmed.`);
     setCurrentIndex((prev) => prev + 1);
-  }, [checklistActive, currentIndex, tools, token]);
+    startToolScanCooldown(currentTool.name);
+    return true;
+  }, [checklistActive, currentIndex, startToolScanCooldown, tools, token]);
+
+  const handleToolMarkerFound = useCallback(async (markerId) => {
+    if (checklistActive && Date.now() < scanCooldownUntilRef.current) {
+      return;
+    }
+
+    const tool = findToolByMarkerId(markerId);
+
+    if (!tool) {
+      setDetectedTool(null);
+      setDetectedMarker({ name: markerId });
+      setHologramMessage(`Unknown tool marker #${markerId}.`);
+      setArStatus(`Marker #${markerId} detected, but no registered tool uses it.`);
+      setScanWarning(`Marker #${markerId} is not assigned to a registered tool.`);
+      return;
+    }
+
+    setDetectedTool(tool);
+    setDetectedMarker({ name: tool.name });
+    setHologramMessage(`${tool.name} detected - marker #${tool.marker_id}`);
+    setArStatus(`Detected ${tool.name} (marker #${tool.marker_id}).`);
+    setActionMessage(`${tool.name} detected.`);
+
+    if (checklistActive) {
+      const accepted = await handleToolScan(markerId);
+      if (accepted) {
+        setArStatus(`${tool.name} confirmed. Move the marker away before scanning the next tool.`);
+      }
+    }
+  }, [checklistActive, findToolByMarkerId, handleToolScan]);
 
   useEffect(() => {
     const handleMessage = (event) => {
@@ -103,8 +183,8 @@ const ARCamera = () => {
       }
 
       if (payload.type === 'arjs-marker-found' && payload.marker) {
-        if (isToolsPage && checklistActive) {
-          handleToolScan(payload.marker);
+        if (isToolsPage) {
+          void handleToolMarkerFound(payload.marker);
         } else if (!isToolsPage) {
           resolveFaultByMarker(payload.marker, 'AR.js');
         }
@@ -113,7 +193,7 @@ const ARCamera = () => {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [resolveFaultByMarker, handleToolScan, isToolsPage, checklistActive]);
+  }, [resolveFaultByMarker, handleToolMarkerFound, isToolsPage]);
 
   const handleFaultCapture = () => {
     if (!faultForm.zone.trim() || !faultForm.faultType.trim()) {
@@ -143,18 +223,18 @@ const ARCamera = () => {
     setActionMessage('');
   };
 
-  const handleManualToolAction = async (action) => {
-    if (!checklistActive || tools.length === 0) {
+  const handleMissingTool = async () => {
+    if (!checklistActive || currentIndex >= tools.length) {
       setActionMessage('Start the tool check first.');
       return;
     }
 
-    const currentTool = tools[Math.min(currentIndex, tools.length - 1)];
+    const targetTool = tools[currentIndex];
 
     try {
-      await logToolActionRequest(token, { tool_id: currentTool.id, action });
-      const labels = { checkin: 'checked in', checkout: 'checked out', missing: 'flagged as missing' };
-      setActionMessage(`${currentTool.name} ${labels[action] || action}.`);
+      await logToolActionRequest(token, { tool_id: targetTool.id, action: 'missing' });
+      setDetectedTool(targetTool);
+      setActionMessage(`${targetTool.name} flagged as missing.`);
     } catch (error) {
       const detail = error instanceof Error ? error.message : 'Action failed';
       setActionMessage(detail);
@@ -263,6 +343,16 @@ const ARCamera = () => {
             <div className="control-section">
               <h3>Tool Check</h3>
 
+              {detectedTool && (
+                <div className="detected-tool-panel">
+                  <p className="tool-scan-instruction">Detected tool</p>
+                  <p className="tool-scan-name">{detectedTool.name}</p>
+                  <p className="tool-scan-marker">
+                    Marker ID: <code>{detectedTool.marker_id}</code>
+                  </p>
+                </div>
+              )}
+
               {!checklistActive && (
                 <button className="control-btn" onClick={startChecklist}>
                   Start Tool Check
@@ -305,13 +395,7 @@ const ARCamera = () => {
                     <p className="marker-help">
                       Current tool: <strong>{tools[currentIndex]?.name}</strong>
                     </p>
-                    <button className="control-btn" onClick={() => handleManualToolAction('checkin')}>
-                      Check In
-                    </button>
-                    <button className="control-btn" onClick={() => handleManualToolAction('checkout')}>
-                      Check Out
-                    </button>
-                    <button className="control-btn control-btn-alert" onClick={() => handleManualToolAction('missing')}>
+                    <button className="control-btn control-btn-alert" onClick={handleMissingTool}>
                       Missing Alert
                     </button>
                   </div>

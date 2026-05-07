@@ -193,6 +193,20 @@
   font-size: 0.85rem;
 }
 
+.tool-owner-select {
+  min-width: 170px;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  background: #111;
+  color: #e2e8f0;
+  padding: 0.45rem 0.55rem;
+}
+
+.tool-owner-select option {
+  background: #1a1a1a;
+  color: #e2e8f0;
+}
+
 .tool-table-actions {
   display: flex;
   gap: 0.4rem;

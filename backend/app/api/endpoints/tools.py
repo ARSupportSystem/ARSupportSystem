@@ -26,32 +26,77 @@ from app.schemas.tool import (
     ToolSessionCreate, ToolSessionComplete, ToolSessionResponse,
     ToolActionCreate, ToolActionResponse,
 )
-from app.api.deps import get_current_user, require_admin
+from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/tools", tags=["tools"])
 
 
-def _assert_marker_unique(db: Session, marker_id: str, exclude_tool_id: int = None) -> None:
-    """Raise 400 if marker_id is already assigned to another tool or any fault."""
-    tool_q = db.query(Tool).filter(Tool.marker_id == marker_id)
+def _assert_marker_unique(
+    db: Session,
+    marker_id: str,
+    owner_id: int,
+    exclude_tool_id: int = None,
+) -> None:
+    """Raise 400 if marker_id is already assigned inside the owner's toolkit or any fault."""
+    tool_q = db.query(Tool).filter(Tool.marker_id == marker_id, Tool.owner_id == owner_id)
     if exclude_tool_id:
         tool_q = tool_q.filter(Tool.id != exclude_tool_id)
     if tool_q.first():
-        raise HTTPException(status_code=400, detail="Marker is already assigned to another tool.")
+        raise HTTPException(status_code=400, detail="Marker is already assigned to another tool in this toolkit.")
 
     if db.query(Fault).filter(Fault.ar_marker_id == marker_id).first():
         raise HTTPException(status_code=400, detail="Marker is already assigned to a fault.")
+
+
+def _can_manage_tool(current_user: User, tool: Tool) -> bool:
+    """Admins can manage all tools; other users can manage only their own toolkit."""
+    return current_user.role == UserRole.admin or tool.owner_id == current_user.id
+
+
+def _assert_can_manage_tool(current_user: User, tool: Tool) -> None:
+    if not _can_manage_tool(current_user, tool):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only manage tools in your own toolkit.",
+        )
+
+
+def _get_tool_owner(db: Session, owner_id: int) -> User:
+    owner = db.query(User).filter(User.id == owner_id, User.is_active == True).first()
+    if not owner:
+        raise HTTPException(status_code=400, detail="Tool owner must be an active user.")
+    return owner
+
+
+def _resolve_owner_id(payload_owner_id: Optional[int], current_user: User, db: Session) -> int:
+    if payload_owner_id is None:
+        return current_user.id
+
+    if current_user.role != UserRole.admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can assign tools to another user.",
+        )
+
+    _get_tool_owner(db, payload_owner_id)
+    return payload_owner_id
 
 
 # ── Tool CRUD ──────────────────────────────────────────────────────────────
 
 @router.get("", response_model=List[ToolResponse])
 def list_tools(
-    available_only: bool = Query(False),
+    available_only: bool = False,
+    owner_id: Optional[int] = None,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     q = db.query(Tool)
+    if current_user.role == UserRole.admin:
+        if owner_id is not None:
+            q = q.filter(Tool.owner_id == owner_id)
+    else:
+        q = q.filter(Tool.owner_id == current_user.id)
     if available_only:
         q = q.filter(Tool.is_available == True)
     return q.all()
@@ -66,6 +111,7 @@ def log_tool_action(
     tool = db.query(Tool).filter(Tool.id == payload.tool_id).first()
     if not tool:
         raise HTTPException(status_code=404, detail="Tool not found")
+    _assert_can_manage_tool(current_user, tool)
 
     ts = datetime.fromisoformat(payload.timestamp) if payload.timestamp else datetime.utcnow()
     action = ToolAction(
@@ -84,14 +130,17 @@ def log_tool_action(
 def create_tool(
     payload: ToolCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
+    owner_id = _resolve_owner_id(payload.owner_id, current_user, db)
     if payload.serial_number:
         if db.query(Tool).filter(Tool.serial_number == payload.serial_number).first():
             raise HTTPException(status_code=400, detail="Serial number already exists")
     if payload.marker_id:
-        _assert_marker_unique(db, payload.marker_id)
-    tool = Tool(**payload.model_dump())
+        _assert_marker_unique(db, payload.marker_id, owner_id=owner_id)
+    tool_data = payload.model_dump()
+    tool_data["owner_id"] = owner_id
+    tool = Tool(**tool_data)
     db.add(tool)
     db.commit()
     db.refresh(tool)
@@ -135,6 +184,7 @@ def create_session(
         tool = db.query(Tool).filter(Tool.id == item_data.tool_id).first()
         if not tool:
             raise HTTPException(status_code=400, detail=f"Tool id={item_data.tool_id} not found")
+        _assert_can_manage_tool(current_user, tool)
         db.add(ToolSessionItem(
             session_id=session.id,
             tool_id=item_data.tool_id,
@@ -201,11 +251,12 @@ def complete_session(
 def get_tool(
     tool_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     tool = db.query(Tool).filter(Tool.id == tool_id).first()
     if not tool:
         raise HTTPException(status_code=404, detail="Tool not found")
+    _assert_can_manage_tool(current_user, tool)
     return tool
 
 
@@ -214,14 +265,28 @@ def update_tool(
     tool_id: int,
     payload: ToolUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ):
     tool = db.query(Tool).filter(Tool.id == tool_id).first()
     if not tool:
         raise HTTPException(status_code=404, detail="Tool not found")
+    _assert_can_manage_tool(current_user, tool)
     update_data = payload.model_dump(exclude_none=True)
-    if "marker_id" in update_data and update_data["marker_id"]:
-        _assert_marker_unique(db, update_data["marker_id"], exclude_tool_id=tool_id)
+
+    next_owner_id = tool.owner_id
+    if "owner_id" in update_data:
+        if current_user.role != UserRole.admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admins can reassign tools.",
+            )
+        next_owner_id = update_data["owner_id"]
+        _get_tool_owner(db, next_owner_id)
+
+    marker_id = update_data.get("marker_id", tool.marker_id)
+    if marker_id:
+        _assert_marker_unique(db, marker_id, owner_id=next_owner_id, exclude_tool_id=tool_id)
+
     for field, value in update_data.items():
         setattr(tool, field, value)
     db.commit()
@@ -233,10 +298,11 @@ def update_tool(
 def delete_tool(
     tool_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     tool = db.query(Tool).filter(Tool.id == tool_id).first()
     if not tool:
         raise HTTPException(status_code=404, detail="Tool not found")
+    _assert_can_manage_tool(current_user, tool)
     db.delete(tool)
     db.commit()
