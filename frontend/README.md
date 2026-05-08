@@ -1,16 +1,34 @@
-# React + Vite
+# AR Support System — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite frontend for the AR-Enhanced Maintenance Support System. The UI provides:
 
-Currently, two official plugins are available:
+- AR fault scanning and annotation workflows
+- AR tool checklists tied to tool sessions
+- Dashboard and monitoring views for supervisors/admins
+- Marker management (admin-only)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Getting Started
 
-## React Compiler
+```bash
+npm install
+npm run dev
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The app expects the backend API at `http://localhost:8000`. To override, create a `.env` file:
 
-## Expanding the ESLint configuration
+```bash
+VITE_API_BASE_URL=http://localhost:8000
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Scripts
+
+```bash
+npm run dev
+npm run build
+npm run lint
+```
+
+## Project Notes
+
+- AR functionality is hosted under `public/arjs/` and embedded in the main React app via an iframe.
+- Admin-only pages (Markers, Tools Admin, Monitoring) are role-gated in the UI.

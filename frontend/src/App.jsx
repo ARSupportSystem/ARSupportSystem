@@ -4,6 +4,7 @@ import Header from './components/Header';
 import HomePage from './components/HomePage';
 import ARCamera from './components/ARCamera';
 import MarkersPage from './components/MarkersPage';
+import MonitoringPage from './components/MonitoringPage';
 import ToolsAdminPage from './components/ToolsAdminPage';
 import LoginPage from './components/LoginPage';
 import { getMeRequest, loginRequest, logoutRequest } from './services/authApi';
@@ -88,13 +89,17 @@ function AppRoutes({ isAuthenticated, isReady, currentUser, onLogin, isSubmittin
           <Route
             path="/monitoring"
             element={
-              <ProtectedRoute isAuthenticated={isAuthenticated} isReady={isReady}>
-                <HomePage currentUser={currentUser} />
-              </ProtectedRoute>
+              <AdminRoute isAuthenticated={isAuthenticated} isReady={isReady} currentUser={currentUser}>
+                <MonitoringPage currentUser={currentUser} />
+              </AdminRoute>
             }
           />
           <Route
             path="/markers"
+            element={<Navigate to="/faults-admin" replace />}
+          />
+          <Route
+            path="/faults-admin"
             element={
               <AdminRoute isAuthenticated={isAuthenticated} isReady={isReady} currentUser={currentUser}>
                 <MarkersPage />

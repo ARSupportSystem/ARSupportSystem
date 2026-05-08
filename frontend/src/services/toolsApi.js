@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
 
 async function parseResponse(response) {
   const contentType = response.headers.get('content-type') || '';
@@ -75,6 +75,44 @@ export async function logToolActionRequest(token, { tool_id, action }) {
     method: 'POST',
     headers: authHeaders(token),
     body: JSON.stringify({ tool_id, action, timestamp: new Date().toISOString() }),
+  });
+
+  return parseResponse(response);
+}
+
+export async function listToolSessionsRequest(token, filters = {}) {
+  const params = new URLSearchParams();
+  if (filters.technician_id !== undefined && filters.technician_id !== null && filters.technician_id !== '') {
+    params.set('technician_id', String(filters.technician_id));
+  }
+  if (filters.session_status) {
+    params.set('session_status', filters.session_status);
+  }
+
+  const query = params.toString();
+  const response = await fetch(`${API_BASE_URL}/api/tools/sessions${query ? `?${query}` : ''}`, {
+    method: 'GET',
+    headers: authHeaders(token),
+  });
+
+  return parseResponse(response);
+}
+
+export async function createToolSessionRequest(token, payload) {
+  const response = await fetch(`${API_BASE_URL}/api/tools/sessions`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+  });
+
+  return parseResponse(response);
+}
+
+export async function completeToolSessionRequest(token, sessionId, payload) {
+  const response = await fetch(`${API_BASE_URL}/api/tools/sessions/${sessionId}/complete`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
   });
 
   return parseResponse(response);

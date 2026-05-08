@@ -3,7 +3,7 @@ const faultDetailsElement = document.getElementById('faultDetails');
 const params = new URLSearchParams(window.location.search);
 const mode = params.get('mode') || 'faults';
 const modeText = mode === 'tools' ? 'Tools mode' : 'Faults mode';
-const API_BASE_URL = params.get('apiBase') || 'http://localhost:8000';
+const API_BASE_URL = params.has('apiBase') ? params.get('apiBase') : 'http://localhost:8000';
 const ownerId = params.get('ownerId') || '';
 const authToken = localStorage.getItem('authToken') || '';
 
@@ -90,7 +90,10 @@ const fetchFaultByMarker = async (markerId) => {
       const detail = typeof payload === 'object' && payload !== null
         ? payload.detail || JSON.stringify(payload)
         : payload || 'Unable to load fault details';
-      renderFaultError(markerId, detail);
+      const message = response.status === 404
+        ? 'Blank marker ready for a technician fault report.'
+        : detail;
+      renderFaultError(markerId, message);
       return;
     }
 
@@ -249,7 +252,7 @@ window.addEventListener('load', async () => {
         sendStatus(`Unable to load tools (${response.status}). Sign in and check the API URL.`);
       }
     } else {
-      // Faults mode — load pattern markers from API
+      // Faults mode - load registered AR.js 3x3 barcode markers from API
       const response = await fetch(`${API_BASE_URL}/api/markers?active_only=true`, {
         method: 'GET',
         headers: { Authorization: `Bearer ${authToken}` },
@@ -257,17 +260,16 @@ window.addEventListener('load', async () => {
 
       if (response.ok) {
         const markers = await response.json();
-        const validMarkers = markers.filter((m) => m.image_url);
+        const validMarkers = markers.filter((marker) => {
+          const markerValue = Number.parseInt(marker.marker_id, 10);
+          return Number.isInteger(markerValue) && markerValue >= 0 && markerValue <= 63;
+        });
 
         validMarkers.forEach((marker) => {
           const markerEl = document.createElement('a-marker');
           markerEl.setAttribute('id', `marker-${marker.marker_id}`);
-          markerEl.setAttribute('preset', 'custom');
-          const url = marker.image_url.startsWith('http')
-            ? marker.image_url
-            : `${API_BASE_URL}${marker.image_url}`;
-          markerEl.setAttribute('type', 'pattern');
-          markerEl.setAttribute('url', url);
+          markerEl.setAttribute('type', 'barcode');
+          markerEl.setAttribute('value', String(marker.marker_id));
           markerEl.setAttribute('emitevents', 'true');
           markerEl.setAttribute('smooth', 'true');
 

@@ -22,10 +22,29 @@ function authHeaders(token) {
   };
 }
 
-export async function listUsersRequest(token) {
-  const response = await fetch(`${API_BASE_URL}/api/users/?page_size=100`, {
+export async function listAnnotationsRequest(token, filters = {}) {
+  const params = new URLSearchParams();
+  if (filters.fault_id) {
+    params.set('fault_id', String(filters.fault_id));
+  }
+  if (filters.ar_marker_id) {
+    params.set('ar_marker_id', String(filters.ar_marker_id));
+  }
+
+  const query = params.toString();
+  const response = await fetch(`${API_BASE_URL}/api/annotations${query ? `?${query}` : ''}`, {
     method: 'GET',
     headers: authHeaders(token),
+  });
+
+  return parseResponse(response);
+}
+
+export async function createAnnotationRequest(token, payload) {
+  const response = await fetch(`${API_BASE_URL}/api/annotations`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
   });
 
   return parseResponse(response);

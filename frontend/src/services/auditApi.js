@@ -22,8 +22,28 @@ function authHeaders(token) {
   };
 }
 
-export async function listUsersRequest(token) {
-  const response = await fetch(`${API_BASE_URL}/api/users/?page_size=100`, {
+function buildQuery(filters) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') return;
+    params.set(key, String(value));
+  });
+  return params.toString();
+}
+
+export async function listAuditLogsRequest(token, filters = {}) {
+  const query = buildQuery(filters);
+  const response = await fetch(`${API_BASE_URL}/api/audit${query ? `?${query}` : ''}`, {
+    method: 'GET',
+    headers: authHeaders(token),
+  });
+
+  return parseResponse(response);
+}
+
+export async function listSecurityEventsRequest(token, filters = {}) {
+  const query = buildQuery(filters);
+  const response = await fetch(`${API_BASE_URL}/api/audit/security-events${query ? `?${query}` : ''}`, {
     method: 'GET',
     headers: authHeaders(token),
   });

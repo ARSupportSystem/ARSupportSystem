@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
 
 async function parseResponse(response) {
   const contentType = response.headers.get('content-type') || '';
@@ -46,6 +46,16 @@ export async function createMarkersBulkRequest(token, markers) {
     method: 'POST',
     headers: authHeaders(token),
     body: JSON.stringify({ markers }),
+  });
+
+  return parseResponse(response);
+}
+
+export async function updateMarkerRequest(token, markerId, markerPayload) {
+  const response = await fetch(`${API_BASE_URL}/api/markers/${encodeURIComponent(markerId)}`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+    body: JSON.stringify(markerPayload),
   });
 
   return parseResponse(response);

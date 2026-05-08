@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
 
 async function parseResponse(response) {
   const contentType = response.headers.get('content-type') || '';
@@ -26,6 +26,19 @@ export async function listFaultsRequest(token) {
   return parseResponse(response);
 }
 
+export async function createFaultRequest(token, payload) {
+  const response = await fetch(`${API_BASE_URL}/api/faults`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return parseResponse(response);
+}
+
 export async function getFaultByMarkerRequest(token, markerId) {
   const response = await fetch(`${API_BASE_URL}/api/faults/marker/${encodeURIComponent(markerId)}`, {
     method: 'GET',
@@ -33,6 +46,34 @@ export async function getFaultByMarkerRequest(token, markerId) {
       Authorization: `Bearer ${token}`,
     },
   });
+
+  return parseResponse(response);
+}
+
+export async function updateFaultStatusRequest(token, faultId, status) {
+  const response = await fetch(`${API_BASE_URL}/api/faults/${faultId}/status`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ status }),
+  });
+
+  return parseResponse(response);
+}
+
+export async function deleteFaultRequest(token, faultId) {
+  const response = await fetch(`${API_BASE_URL}/api/faults/${faultId}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (response.status === 204) {
+    return null;
+  }
 
   return parseResponse(response);
 }

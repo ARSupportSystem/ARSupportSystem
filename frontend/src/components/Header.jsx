@@ -36,17 +36,19 @@ const Header = ({ isAuthenticated, currentUser, onLogout }) => {
                   Manage Tools
                 </NavLink>
               </li>
-              <li>
-                <NavLink to="/monitoring" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
-                  Monitoring
-                </NavLink>
-              </li>
               {currentUser?.role === 'admin' && (
-                <li>
-                  <NavLink to="/markers" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
-                    Markers
-                  </NavLink>
-                </li>
+                <>
+                  <li>
+                    <NavLink to="/monitoring" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+                      Monitoring
+                    </NavLink>
+                  </li>
+                  <li>
+                    <NavLink to="/faults-admin" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+                      Manage Faults
+                    </NavLink>
+                  </li>
+                </>
               )}
               <li className="user-pill">{currentUser?.full_name} ({roleLabel})</li>
               <li>
