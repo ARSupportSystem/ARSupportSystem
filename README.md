@@ -4,12 +4,14 @@ AR-Enhanced Maintenance Support System for Public Transport Environments.
 This repo contains:
 - **Backend**: FastAPI + SQLAlchemy services for authentication, fault management, markers, annotations, tools, tool sessions, and audit logs.
 - **Frontend**: React + Vite UI for AR scanning, dashboards, monitoring, marker admin, and tool management.
+- **Docs**: Report-ready architecture, UX, accessibility, and security rationale in [docs/design-security-rationale.md](docs/design-security-rationale.md).
 
 ## Workspace Layout
 
 ```
 backend/   # FastAPI server + database models
 frontend/  # React + Vite web UI
+docs/      # Design, AR UX, and security rationale
 ```
 
 ## Quick Start

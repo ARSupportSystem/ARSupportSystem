@@ -19,6 +19,7 @@ from app.schemas.marker import (
     MarkerUpdate,
     MarkerResponse,
 )
+from app.services.audit import record_audit_event
 
 router = APIRouter(prefix="/markers", tags=["markers"])
 
@@ -121,6 +122,15 @@ def create_marker(
 
     marker = Marker(**payload.model_dump(), created_by_id=current_user.id)
     db.add(marker)
+    db.flush()
+    record_audit_event(
+        db,
+        action="MARKER_CREATED",
+        user_id=current_user.id,
+        resource_type="marker",
+        resource_id=marker.id,
+        details={"marker_id": marker.marker_id, "label": marker.label, "is_active": marker.is_active},
+    )
     db.commit()
     db.refresh(marker)
     return _serialize_marker(marker)
@@ -149,6 +159,17 @@ def create_markers_bulk(
         marker = Marker(**item.model_dump(), created_by_id=current_user.id)
         db.add(marker)
         created_markers.append(marker)
+
+    db.flush()
+    for marker in created_markers:
+        record_audit_event(
+            db,
+            action="MARKER_CREATED",
+            user_id=current_user.id,
+            resource_type="marker",
+            resource_id=marker.id,
+            details={"marker_id": marker.marker_id, "label": marker.label, "bulk": True},
+        )
 
     db.commit()
     for marker in created_markers:
@@ -206,6 +227,21 @@ async def upload_marker_images(
         db.add(marker)
         created_markers.append(marker)
 
+    db.flush()
+    for marker in created_markers:
+        record_audit_event(
+            db,
+            action="MARKER_IMAGE_UPLOADED",
+            user_id=current_user.id,
+            resource_type="marker",
+            resource_id=marker.id,
+            details={
+                "marker_id": marker.marker_id,
+                "label": marker.label,
+                "image_url": _marker_image_url(marker),
+            },
+        )
+
     db.commit()
     for marker in created_markers:
         db.refresh(marker)
@@ -250,15 +286,24 @@ def update_marker(
     marker_id: str,
     payload: MarkerUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    current_user: User = Depends(require_admin),
 ):
     marker = db.query(Marker).filter(Marker.marker_id == marker_id).first()
     if not marker:
         raise HTTPException(status_code=404, detail="Marker not found")
 
+    update_data = payload.model_dump(exclude_none=True)
     for field, value in payload.model_dump(exclude_none=True).items():
         setattr(marker, field, value)
 
+    record_audit_event(
+        db,
+        action="MARKER_UPDATED",
+        user_id=current_user.id,
+        resource_type="marker",
+        resource_id=marker.id,
+        details={"marker_id": marker.marker_id, "fields": sorted(update_data.keys())},
+    )
     db.commit()
     db.refresh(marker)
     return _serialize_marker(marker)

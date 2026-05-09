@@ -112,7 +112,7 @@ const MonitoringPage = ({ currentUser }) => {
       id: `fault-${fault.id}`,
       type: 'Fault',
       title: fault.title,
-      detail: `Marker #${fault.ar_marker_id || 'none'} · ${fault.status.replace('_', ' ')}`,
+      detail: `Marker #${fault.ar_marker_id || 'none'} - ${fault.status.replace('_', ' ')} - severity ${fault.severity}`,
       time: fault.created_at,
       severity: fault.severity,
     }));
@@ -121,7 +121,7 @@ const MonitoringPage = ({ currentUser }) => {
       id: `session-${session.id}`,
       type: 'Tool Check',
       title: session.session_name,
-      detail: session.status.replace('_', ' '),
+      detail: `${session.status.replace('_', ' ')} - severity ${session.status === 'incomplete' ? 'high' : 'low'}`,
       time: session.completed_at || session.started_at,
       severity: session.status === 'incomplete' ? 'high' : 'low',
     }));
@@ -201,7 +201,7 @@ const MonitoringPage = ({ currentUser }) => {
                       </td>
                       <td><span className={`monitoring-chip severity-${fault.severity}`}>{fault.severity}</span></td>
                       <td>{fault.status.replace('_', ' ')}</td>
-                      <td>{fault.location}{fault.location_detail ? ` · ${fault.location_detail}` : ''}</td>
+                      <td>{fault.location}{fault.location_detail ? ` - ${fault.location_detail}` : ''}</td>
                       <td>{formatDateTime(fault.created_at)}</td>
                     </tr>
                   ))}
@@ -246,10 +246,10 @@ const MonitoringPage = ({ currentUser }) => {
             <ul className="monitoring-feed">
               {recentEvents.map((event) => (
                 <li key={event.id}>
-                  <span className={`monitoring-feed-dot severity-${event.severity}`} />
+                  <span className={`monitoring-feed-dot severity-${event.severity}`} aria-hidden="true" />
                   <div>
                     <strong>{event.type}: {event.title}</strong>
-                    <span>{event.detail} · {formatDateTime(event.time)}</span>
+                    <span>{event.detail} - {formatDateTime(event.time)}</span>
                   </div>
                 </li>
               ))}
@@ -269,10 +269,10 @@ const MonitoringPage = ({ currentUser }) => {
               <ul className="monitoring-feed">
                 {securityEvents.map((event) => (
                   <li key={event.id}>
-                    <span className={`monitoring-feed-dot severity-${securitySeverity(event.action)}`} />
+                    <span className={`monitoring-feed-dot severity-${securitySeverity(event.action)}`} aria-hidden="true" />
                     <div>
                       <strong>{event.action.replace(/_/g, ' ')}</strong>
-                      <span>{event.ip_address || 'Unknown IP'} · {formatDateTime(event.timestamp)}</span>
+                      <span>{event.ip_address || 'Unknown IP'} - {event.actor?.email || 'system'} - {formatDateTime(event.timestamp)}</span>
                     </div>
                   </li>
                 ))}
@@ -293,11 +293,11 @@ const MonitoringPage = ({ currentUser }) => {
               <ul className="monitoring-feed">
                 {auditLogs.map((entry) => (
                   <li key={entry.id}>
-                    <span className="monitoring-feed-dot severity-low" />
+                    <span className="monitoring-feed-dot severity-low" aria-hidden="true" />
                     <div>
                       <strong>{entry.action.replace(/_/g, ' ')}</strong>
                       <span>
-                        User {entry.user_id ?? 'system'} · {entry.resource_type || 'general'} · {formatDateTime(entry.timestamp)}
+                        {entry.actor?.email || `User ${entry.user_id ?? 'system'}`} - {entry.resource_type || 'general'} #{entry.resource_id ?? '-'} - {formatDateTime(entry.timestamp)}
                       </span>
                     </div>
                   </li>

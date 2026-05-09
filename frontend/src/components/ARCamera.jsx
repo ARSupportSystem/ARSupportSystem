@@ -52,6 +52,7 @@ const ARCamera = ({ currentUser }) => {
   const [checklistActive, setChecklistActive] = useState(false);
   const [toolSession, setToolSession] = useState(null);
   const [isCompletingSession, setIsCompletingSession] = useState(false);
+  const [signoffAccepted, setSignoffAccepted] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [confirmed, setConfirmed] = useState([]);
   const [missingTools, setMissingTools] = useState([]);
@@ -109,6 +110,23 @@ const ARCamera = ({ currentUser }) => {
         secondaryLabel: 'Fault status',
       };
   void pageContent;
+
+  const arWorkflowSteps = isToolsPage
+    ? ['Start', 'Scan', 'Sign off', 'Summary']
+    : ['Scan', 'Confirm', 'Annotate', 'Save'];
+
+  const activeWorkflowStep = useMemo(() => {
+    if (isToolsPage) {
+      if (!checklistActive) return toolSession && toolSession.status !== 'active' ? 'Summary' : 'Start';
+      if (toolSession && toolSession.status !== 'active') return 'Summary';
+      if (currentIndex >= tools.length && tools.length > 0) return 'Sign off';
+      return 'Scan';
+    }
+
+    if (!detectedMarker) return 'Scan';
+    if (detectedMarker.fault) return faultAnnotations.length > 0 ? 'Annotate' : 'Confirm';
+    return 'Save';
+  }, [checklistActive, currentIndex, detectedMarker, faultAnnotations.length, isToolsPage, toolSession, tools.length]);
 
   // Load tools when in tools mode
   useEffect(() => {
@@ -392,6 +410,7 @@ const ARCamera = ({ currentUser }) => {
       setConfirmed([]);
       setMissingTools([]);
       setCurrentIndex(0);
+      setSignoffAccepted(false);
       setScanWarning('');
       setActionMessage(`Tool session #${session.id} started.`);
       setChecklistActive(true);
@@ -407,6 +426,7 @@ const ARCamera = ({ currentUser }) => {
     setConfirmed([]);
     setMissingTools([]);
     setCurrentIndex(0);
+    setSignoffAccepted(false);
     setScanWarning('');
     setActionMessage('');
   };
@@ -433,39 +453,46 @@ const ARCamera = ({ currentUser }) => {
     }
   };
 
-  const checklistComplete = checklistActive && currentIndex >= tools.length;
+  const checklistComplete = checklistActive && currentIndex >= tools.length && tools.length > 0;
+  const sessionReadyForSignoff = checklistComplete && toolSession?.status === 'active';
+  const sessionSignedOff = Boolean(toolSession && toolSession.status !== 'active');
 
-  useEffect(() => {
-    if (!checklistComplete || !toolSession || isCompletingSession) return;
+  const completeChecklistSession = async () => {
+    if (!toolSession || !sessionReadyForSignoff) {
+      setActionMessage('Complete the scan checklist before signing off.');
+      return;
+    }
 
-    const completeSession = async () => {
-      try {
-        setIsCompletingSession(true);
-        const completed = await completeToolSessionRequest(token, toolSession.id, {
-          verified_items: tools.map((tool) => ({
-            tool_id: tool.id,
-            actual_count: confirmed.includes(tool.id) ? 1 : 0,
-          })),
-          notes: missingTools.length > 0
-            ? `Missing tools: ${tools.filter((tool) => missingTools.includes(tool.id)).map((tool) => tool.name).join(', ')}`
-            : 'All tools accounted for in AR checklist.',
-        });
-        setToolSession(completed);
-        setActionMessage(
-          completed.status === 'completed'
-            ? `Tool session #${completed.id} completed. All tools accounted for.`
-            : `Tool session #${completed.id} incomplete. ${missingTools.length} tool${missingTools.length === 1 ? '' : 's'} missing.`,
-        );
-      } catch (error) {
-        const detail = error instanceof Error ? error.message : 'Unable to complete tool session';
-        setActionMessage(detail);
-      } finally {
-        setIsCompletingSession(false);
-      }
-    };
+    if (!signoffAccepted) {
+      setActionMessage('Confirm the tool-check declaration before signing off.');
+      return;
+    }
 
-    completeSession();
-  }, [checklistComplete, confirmed, isCompletingSession, missingTools, token, toolSession, tools]);
+    try {
+      setIsCompletingSession(true);
+      const completed = await completeToolSessionRequest(token, toolSession.id, {
+        verified_items: tools.map((tool) => ({
+          tool_id: tool.id,
+          actual_count: confirmed.includes(tool.id) ? 1 : 0,
+        })),
+        notes: missingTools.length > 0
+          ? `Signed off with missing tools: ${tools.filter((tool) => missingTools.includes(tool.id)).map((tool) => tool.name).join(', ')}`
+          : 'Signed off by technician. All tools accounted for in AR checklist.',
+      });
+      setToolSession(completed);
+      setChecklistActive(false);
+      setActionMessage(
+        completed.status === 'completed'
+          ? `Tool session #${completed.id} signed off. All tools accounted for.`
+          : `Tool session #${completed.id} signed off as incomplete. ${missingTools.length} tool${missingTools.length === 1 ? '' : 's'} missing.`,
+      );
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'Unable to complete tool session';
+      setActionMessage(detail);
+    } finally {
+      setIsCompletingSession(false);
+    }
+  };
 
   return (
     <div className="ar-camera-container">
@@ -510,8 +537,21 @@ const ARCamera = ({ currentUser }) => {
           <h2>Controls</h2>
           <div className="xr-status-block">
             <p className="xr-status-label">AR.js Status</p>
-            <p className="xr-status-message ok">{arStatus}</p>
+            <p className="xr-status-message ok" role="status" aria-live="polite">{arStatus}</p>
           </div>
+
+          <ol className="ar-flow-steps" aria-label="Guided AR workflow">
+            {arWorkflowSteps.map((step, index) => {
+              const activeIndex = arWorkflowSteps.indexOf(activeWorkflowStep);
+              const stateClass = index < activeIndex ? 'complete' : index === activeIndex ? 'active' : '';
+              return (
+                <li key={step} className={stateClass} aria-current={step === activeWorkflowStep ? 'step' : undefined}>
+                  <span>{index + 1}</span>
+                  <strong>{step}</strong>
+                </li>
+              );
+            })}
+          </ol>
 
           {!isToolsPage && detectedMarker?.fault && (
             <div className="control-section fault-action-panel">
@@ -623,10 +663,13 @@ const ARCamera = ({ currentUser }) => {
                 <input
                   id="fault-report-title"
                   type="text"
+                  required
+                  aria-describedby="fault-report-title-help"
                   placeholder="e.g. Damaged cabinet door"
                   value={faultReport.title}
                   onChange={(event) => handleFaultReportChange('title', event.target.value)}
                 />
+                <p id="fault-report-title-help" className="field-help">Required before this marker can be saved as a fault.</p>
 
                 <label htmlFor="fault-report-severity">Severity</label>
                 <select
@@ -705,7 +748,7 @@ const ARCamera = ({ currentUser }) => {
                 </div>
               )}
 
-              {!checklistActive && (
+              {!checklistActive && !sessionSignedOff && (
                 <button className="control-btn" onClick={startChecklist}>
                   Start Tool Check
                 </button>
@@ -721,7 +764,7 @@ const ARCamera = ({ currentUser }) => {
                     </p>
                   </div>
 
-                  {scanWarning && <p className="tool-scan-warning">{scanWarning}</p>}
+                  {scanWarning && <p className="tool-scan-warning" role="alert">{scanWarning}</p>}
 
                   <ul className="tool-checklist">
                     {tools.map((tool, index) => {
@@ -732,8 +775,8 @@ const ARCamera = ({ currentUser }) => {
                           key={tool.id}
                           className={`tool-checklist-item ${isDone ? 'done' : ''} ${isCurrent ? 'current' : ''}`}
                         >
-                          <span className="tool-checklist-status">
-                            {isDone ? '✓' : isCurrent ? '▶' : '○'}
+                          <span className="tool-checklist-status" aria-hidden="true">
+                            {isDone ? 'OK' : isCurrent ? 'Now' : 'Wait'}
                           </span>
                           <span className="tool-checklist-name">{tool.name}</span>
                           <code className="tool-checklist-marker">{tool.marker_id}</code>
@@ -758,15 +801,60 @@ const ARCamera = ({ currentUser }) => {
                 </>
               )}
 
-              {checklistComplete && (
+              {sessionReadyForSignoff && (
+                <div className="tool-signoff-panel">
+                  <h3>Sign Off Tool Check</h3>
+                  <p className="tool-complete-message">
+                    Scan pass complete. Confirm the returned counts before closing session #{toolSession.id}.
+                  </p>
+                  <div className="tool-signoff-summary" aria-label="Tool check summary">
+                    <div><span>Confirmed</span><strong>{confirmed.length}</strong></div>
+                    <div><span>Missing</span><strong>{missingTools.length}</strong></div>
+                    <div><span>Total</span><strong>{tools.length}</strong></div>
+                  </div>
+                  {missingTools.length > 0 && (
+                    <ul className="tool-checklist">
+                      {tools.filter((tool) => missingTools.includes(tool.id)).map((tool) => (
+                        <li key={tool.id} className="tool-checklist-item missing">
+                          <span className="tool-checklist-status" aria-hidden="true">Missing</span>
+                          <span className="tool-checklist-name">{tool.name}</span>
+                          <code className="tool-checklist-marker">{tool.marker_id}</code>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <label className="tool-signoff-check">
+                    <input
+                      type="checkbox"
+                      checked={signoffAccepted}
+                      onChange={(event) => setSignoffAccepted(event.target.checked)}
+                    />
+                    I confirm these counts are accurate and ready for supervisor audit.
+                  </label>
+                  <button
+                    className="control-btn"
+                    onClick={completeChecklistSession}
+                    disabled={isCompletingSession || !signoffAccepted}
+                  >
+                    {isCompletingSession ? 'Signing Off...' : 'Complete Session Sign Off'}
+                  </button>
+                </div>
+              )}
+
+              {sessionSignedOff && (
                 <div className="tool-checklist-complete">
                   <p className="tool-complete-message">
-                    Tool check complete. All {tools.length} tool{tools.length === 1 ? '' : 's'} accounted for.
+                    Tool check signed off as {toolSession.status.replace('_', ' ')}.
                   </p>
                   <ul className="tool-checklist">
                     {tools.map((tool) => (
-                      <li key={tool.id} className="tool-checklist-item done">
-                        <span className="tool-checklist-status">✓</span>
+                      <li
+                        key={tool.id}
+                        className={`tool-checklist-item ${missingTools.includes(tool.id) ? 'missing' : 'done'}`}
+                      >
+                        <span className="tool-checklist-status" aria-hidden="true">
+                          {missingTools.includes(tool.id) ? 'Missing' : 'OK'}
+                        </span>
                         <span className="tool-checklist-name">{tool.name}</span>
                         <code className="tool-checklist-marker">{tool.marker_id}</code>
                       </li>
@@ -780,7 +868,7 @@ const ARCamera = ({ currentUser }) => {
             </div>
           )}
 
-          {actionMessage && <p className="action-message">{actionMessage}</p>}
+          {actionMessage && <p className="action-message" role="status" aria-live="polite">{actionMessage}</p>}
         </div>
       </section>
     </div>

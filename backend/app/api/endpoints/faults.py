@@ -21,6 +21,7 @@ from app.models.fault import Fault, FaultStatus, FaultSeverity, FaultLocation
 from app.models.marker import Marker
 from app.schemas.fault import FaultCreate, FaultUpdate, FaultStatusUpdate, FaultResponse
 from app.api.deps import get_current_user, require_admin
+from app.services.audit import record_audit_event
 
 router = APIRouter(prefix="/faults", tags=["faults"])
 
@@ -104,6 +105,21 @@ def create_fault(
 
     fault = Fault(**payload.model_dump(), reported_by_id=current_user.id)
     db.add(fault)
+    db.flush()
+    record_audit_event(
+        db,
+        action="FAULT_CREATED",
+        user_id=current_user.id,
+        resource_type="fault",
+        resource_id=fault.id,
+        details={
+            "title": fault.title,
+            "severity": fault.severity.value,
+            "location": fault.location.value,
+            "ar_marker_id": fault.ar_marker_id,
+            "assigned_to_id": fault.assigned_to_id,
+        },
+    )
     db.commit()
     db.refresh(fault)
     return _serialize_fault(fault, db)
@@ -159,6 +175,17 @@ def update_fault(
 
     for field, value in payload.model_dump(exclude_none=True).items():
         setattr(fault, field, value)
+    record_audit_event(
+        db,
+        action="FAULT_UPDATED",
+        user_id=current_user.id,
+        resource_type="fault",
+        resource_id=fault.id,
+        details={
+            "fields": sorted(payload.model_dump(exclude_none=True).keys()),
+            "ar_marker_id": fault.ar_marker_id,
+        },
+    )
     db.commit()
     db.refresh(fault)
     return _serialize_fault(fault, db)
@@ -169,15 +196,28 @@ def update_fault_status(
     fault_id: int,
     payload: FaultStatusUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     fault = db.query(Fault).filter(Fault.id == fault_id).first()
     if not fault:
         raise HTTPException(status_code=404, detail="Fault not found")
 
+    previous_status = fault.status
     fault.status = payload.status
     if payload.status == FaultStatus.resolved:
         fault.resolved_at = datetime.utcnow()
+    record_audit_event(
+        db,
+        action="FAULT_STATUS_UPDATED",
+        user_id=current_user.id,
+        resource_type="fault",
+        resource_id=fault.id,
+        details={
+            "previous_status": previous_status.value,
+            "new_status": payload.status.value,
+            "ar_marker_id": fault.ar_marker_id,
+        },
+    )
     db.commit()
     db.refresh(fault)
     return _serialize_fault(fault, db)
@@ -187,10 +227,18 @@ def update_fault_status(
 def delete_fault(
     fault_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    current_user: User = Depends(require_admin),
 ):
     fault = db.query(Fault).filter(Fault.id == fault_id).first()
     if not fault:
         raise HTTPException(status_code=404, detail="Fault not found")
+    record_audit_event(
+        db,
+        action="FAULT_DELETED",
+        user_id=current_user.id,
+        resource_type="fault",
+        resource_id=fault.id,
+        details={"title": fault.title, "ar_marker_id": fault.ar_marker_id},
+    )
     db.delete(fault)
     db.commit()

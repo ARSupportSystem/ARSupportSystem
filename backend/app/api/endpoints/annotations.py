@@ -16,6 +16,7 @@ from app.models.user import User, UserRole
 from app.models.annotation import ARAnnotation
 from app.schemas.annotation import AnnotationCreate, AnnotationUpdate, AnnotationResponse
 from app.api.deps import get_current_user
+from app.services.audit import record_audit_event
 
 router = APIRouter(prefix="/annotations", tags=["annotations"])
 
@@ -43,6 +44,19 @@ def create_annotation(
 ):
     annotation = ARAnnotation(**payload.model_dump(), created_by_id=current_user.id)
     db.add(annotation)
+    db.flush()
+    record_audit_event(
+        db,
+        action="ANNOTATION_CREATED",
+        user_id=current_user.id,
+        resource_type="annotation",
+        resource_id=annotation.id,
+        details={
+            "fault_id": annotation.fault_id,
+            "ar_marker_id": annotation.ar_marker_id,
+            "annotation_type": annotation.annotation_type.value,
+        },
+    )
     db.commit()
     db.refresh(annotation)
     return annotation

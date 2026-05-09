@@ -65,6 +65,7 @@ def list_audit_logs(
                 "details": _parse_details(item.details),
                 "ip_address": item.ip_address,
                 "timestamp": item.timestamp,
+                "actor": _serialize_actor(item.user),
             }
             for item in logs
         ],
@@ -120,6 +121,7 @@ def list_security_events(
                 "details": _parse_details(item.details),
                 "ip_address": item.ip_address,
                 "timestamp": item.timestamp,
+                "actor": _serialize_actor(item.user),
             }
             for item in logs
         ],
@@ -139,3 +141,15 @@ def _parse_details(details: str | None) -> dict | None:
         return json.loads(details)
     except json.JSONDecodeError:
         return {"raw": details}
+
+
+def _serialize_actor(user: User | None) -> dict | None:
+    """Expose enough actor context for monitoring without leaking credentials."""
+    if not user:
+        return None
+    return {
+        "id": user.id,
+        "email": user.email,
+        "full_name": user.full_name,
+        "role": user.role.value,
+    }

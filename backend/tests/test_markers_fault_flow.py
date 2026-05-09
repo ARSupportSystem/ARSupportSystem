@@ -147,7 +147,7 @@ def test_admin_can_delete_fault_and_free_marker_for_new_fault():
             current_user=technician,
         )
 
-        delete_fault(fault_id=created["id"], db=db, _=admin)
+        delete_fault(fault_id=created["id"], db=db, current_user=admin)
 
         recreated = create_fault(
             payload=FaultCreate(

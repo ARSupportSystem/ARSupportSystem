@@ -27,6 +27,7 @@ from app.schemas.tool import (
     ToolActionCreate, ToolActionResponse,
 )
 from app.api.deps import get_current_user
+from app.services.audit import record_audit_event
 
 router = APIRouter(prefix="/tools", tags=["tools"])
 
@@ -121,6 +122,14 @@ def log_tool_action(
         timestamp=ts,
     )
     db.add(action)
+    record_audit_event(
+        db,
+        action="TOOL_ACTION_RECORDED",
+        user_id=current_user.id,
+        resource_type="tool",
+        resource_id=tool.id,
+        details={"tool_name": tool.name, "tool_action": payload.action},
+    )
     db.commit()
     db.refresh(action)
     return action
@@ -142,6 +151,19 @@ def create_tool(
     tool_data["owner_id"] = owner_id
     tool = Tool(**tool_data)
     db.add(tool)
+    db.flush()
+    record_audit_event(
+        db,
+        action="TOOL_CREATED",
+        user_id=current_user.id,
+        resource_type="tool",
+        resource_id=tool.id,
+        details={
+            "tool_name": tool.name,
+            "marker_id": tool.marker_id,
+            "owner_id": tool.owner_id,
+        },
+    )
     db.commit()
     db.refresh(tool)
     return tool
@@ -191,6 +213,18 @@ def create_session(
             expected_count=item_data.expected_count,
         ))
 
+    record_audit_event(
+        db,
+        action="TOOL_SESSION_STARTED",
+        user_id=current_user.id,
+        resource_type="tool_session",
+        resource_id=session.id,
+        details={
+            "session_name": session.session_name,
+            "fault_id": session.fault_id,
+            "tool_count": len(payload.items),
+        },
+    )
     db.commit()
     db.refresh(session)
     return session
@@ -231,17 +265,37 @@ def complete_session(
 
     for item in session.items:
         actual = verified_map.get(item.tool_id)
-        if actual is not None:
-            item.actual_count = actual
-            item.is_verified = actual >= item.expected_count
-            if not item.is_verified:
-                all_verified = False
+        if actual is None:
+            item.actual_count = 0
+            item.is_verified = False
+            all_verified = False
+            continue
+
+        item.actual_count = actual
+        item.is_verified = actual >= item.expected_count
+        if not item.is_verified:
+            all_verified = False
 
     session.status = ToolSessionStatus.completed if all_verified else ToolSessionStatus.incomplete
     session.completed_at = datetime.utcnow()
     if payload.notes:
         session.notes = payload.notes
 
+    missing_tool_ids = [item.tool_id for item in session.items if item.actual_count < item.expected_count]
+    record_audit_event(
+        db,
+        action="TOOL_SESSION_COMPLETED",
+        user_id=current_user.id,
+        resource_type="tool_session",
+        resource_id=session.id,
+        details={
+            "session_name": session.session_name,
+            "status": session.status.value,
+            "fault_id": session.fault_id,
+            "missing_tool_ids": missing_tool_ids,
+            "verified_count": len(payload.verified_items),
+        },
+    )
     db.commit()
     db.refresh(session)
     return session
@@ -289,6 +343,19 @@ def update_tool(
 
     for field, value in update_data.items():
         setattr(tool, field, value)
+    record_audit_event(
+        db,
+        action="TOOL_UPDATED",
+        user_id=current_user.id,
+        resource_type="tool",
+        resource_id=tool.id,
+        details={
+            "tool_name": tool.name,
+            "fields": sorted(update_data.keys()),
+            "marker_id": tool.marker_id,
+            "owner_id": tool.owner_id,
+        },
+    )
     db.commit()
     db.refresh(tool)
     return tool
@@ -304,5 +371,13 @@ def delete_tool(
     if not tool:
         raise HTTPException(status_code=404, detail="Tool not found")
     _assert_can_manage_tool(current_user, tool)
+    record_audit_event(
+        db,
+        action="TOOL_DELETED",
+        user_id=current_user.id,
+        resource_type="tool",
+        resource_id=tool.id,
+        details={"tool_name": tool.name, "marker_id": tool.marker_id, "owner_id": tool.owner_id},
+    )
     db.delete(tool)
     db.commit()
