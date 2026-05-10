@@ -1,4 +1,3 @@
-from math import radians, sin, cos, sqrt, atan2
 from pathlib import Path
 from uuid import uuid4
 from typing import List, Optional
@@ -64,37 +63,6 @@ def _derive_extension_from_content(content: bytes, original_name: str | None) ->
 
 def _next_marker_id() -> str:
     return f"MKR-{uuid4().hex[:8].upper()}"
-
-
-def _distance_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    earth_radius_m = 6371000
-    d_lat = radians(lat2 - lat1)
-    d_lon = radians(lon2 - lon1)
-
-    a = (
-        sin(d_lat / 2) ** 2
-        + cos(radians(lat1)) * cos(radians(lat2)) * sin(d_lon / 2) ** 2
-    )
-    c = 2 * atan2(sqrt(a), sqrt(1 - a))
-    return earth_radius_m * c
-
-
-def _serialize_fault_with_distance(fault: Fault, marker: Marker) -> dict:
-    payload = FaultResponse.model_validate(fault).model_dump()
-    payload["distance_from_marker_m"] = None
-
-    if (
-        marker.latitude is not None
-        and marker.longitude is not None
-        and fault.latitude is not None
-        and fault.longitude is not None
-    ):
-        payload["distance_from_marker_m"] = round(
-            _distance_meters(marker.latitude, marker.longitude, fault.latitude, fault.longitude),
-            2,
-        )
-
-    return payload
 
 
 @router.get("", response_model=List[MarkerResponse])
@@ -325,41 +293,4 @@ def list_faults_for_marker(
         .order_by(Fault.created_at.desc())
         .all()
     )
-    return [_serialize_fault_with_distance(fault, marker) for fault in faults]
-
-
-@router.get("/{marker_id}/nearest-fault")
-def nearest_fault_for_marker(
-    marker_id: str,
-    max_distance_m: Optional[float] = Query(None, gt=0),
-    db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
-):
-    """Optional utility endpoint: find nearest fault linked to the marker by fault coordinates."""
-    marker = db.query(Marker).filter(Marker.marker_id == marker_id).first()
-    if not marker:
-        raise HTTPException(status_code=404, detail="Marker not found")
-
-    if marker.latitude is None or marker.longitude is None:
-        raise HTTPException(status_code=400, detail="Marker has no saved coordinates")
-
-    faults = db.query(Fault).filter(Fault.ar_marker_id == marker_id).all()
-    with_distance = []
-    for fault in faults:
-        if fault.latitude is None or fault.longitude is None:
-            continue
-        distance = _distance_meters(marker.latitude, marker.longitude, fault.latitude, fault.longitude)
-        with_distance.append((distance, fault))
-
-    if not with_distance:
-        raise HTTPException(status_code=404, detail="No geolocated faults found for this marker")
-
-    with_distance.sort(key=lambda item: item[0])
-    distance, nearest = with_distance[0]
-
-    if max_distance_m is not None and distance > max_distance_m:
-        raise HTTPException(status_code=404, detail="No fault found within requested distance")
-
-    payload = FaultResponse.model_validate(nearest).model_dump()
-    payload["distance_from_marker_m"] = round(distance, 2)
-    return payload
+    return faults

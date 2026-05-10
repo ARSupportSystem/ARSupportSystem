@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -13,10 +13,7 @@ class Marker(Base):
     label = Column(String, nullable=True)
     description = Column(Text, nullable=True)
 
-    # Physical marker placement (optional)
     location_detail = Column(String, nullable=True)
-    latitude = Column(Float, nullable=True)
-    longitude = Column(Float, nullable=True)
 
     is_active = Column(Boolean, nullable=False, default=True)
 

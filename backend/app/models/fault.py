@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Enum, ForeignKey, Text, Float
+from sqlalchemy import Column, Integer, String, DateTime, Enum, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
@@ -41,10 +41,6 @@ class Fault(Base):
     location = Column(Enum(FaultLocation), default=FaultLocation.other, nullable=False)
     location_detail = Column(String)         # e.g. "Platform 3, Bay B"
     ar_marker_id = Column(String, index=True) # ID of the physical AR marker
-
-    # GPS / spatial data (optional)
-    latitude = Column(Float)
-    longitude = Column(Float)
 
     reported_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     assigned_to_id = Column(Integer, ForeignKey("users.id"), nullable=True)

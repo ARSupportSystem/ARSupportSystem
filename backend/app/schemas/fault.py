@@ -13,8 +13,6 @@ class FaultCreate(BaseModel):
     location: FaultLocation = FaultLocation.other
     location_detail: Optional[str] = None
     ar_marker_id: Optional[str] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
     assigned_to_id: Optional[int] = None
 
 
@@ -47,12 +45,8 @@ class FaultResponse(BaseModel):
     location: FaultLocation
     location_detail: Optional[str]
     ar_marker_id: Optional[str]
-    latitude: Optional[float]
-    longitude: Optional[float]
     reported_by_id: int
     assigned_to_id: Optional[int]
     created_at: datetime
     updated_at: Optional[datetime]
     resolved_at: Optional[datetime]
-    distance_from_marker_m: Optional[float] = None
-

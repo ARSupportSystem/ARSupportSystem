@@ -54,7 +54,7 @@ def test_create_fault_requires_registered_marker():
         db.close()
 
 
-def test_create_fault_with_marker_calculates_distance_and_uses_marker_location_detail():
+def test_create_fault_with_marker_uses_marker_location_detail():
     db = _make_db_session()
     try:
         admin = _create_user(db, "admin1@test.com", UserRole.admin)
@@ -64,8 +64,6 @@ def test_create_fault_with_marker_calculates_distance_and_uses_marker_location_d
             marker_id="flt-100",
             label="Test Marker",
             location_detail="Platform A",
-            latitude=-37.8182,
-            longitude=144.9671,
             is_active=True,
             created_by_id=admin.id,
         )
@@ -78,16 +76,12 @@ def test_create_fault_with_marker_calculates_distance_and_uses_marker_location_d
             severity=FaultSeverity.high,
             location=FaultLocation.vehicle,
             ar_marker_id="flt-100",
-            latitude=-37.8180,
-            longitude=144.9676,
         )
 
         created = create_fault(payload=payload, db=db, current_user=technician)
 
         assert created["ar_marker_id"] == "flt-100"
         assert created["location_detail"] == "Platform A"
-        assert created["distance_from_marker_m"] is not None
-        assert created["distance_from_marker_m"] > 0
     finally:
         db.close()
 

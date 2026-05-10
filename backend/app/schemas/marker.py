@@ -12,8 +12,6 @@ class MarkerCreate(BaseModel):
     label: Optional[str] = None
     description: Optional[str] = None
     location_detail: Optional[str] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
     is_active: bool = True
 
 
@@ -29,8 +27,6 @@ class MarkerUpdate(BaseModel):
     label: Optional[str] = None
     description: Optional[str] = None
     location_detail: Optional[str] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
     is_active: Optional[bool] = None
 
 
@@ -42,8 +38,6 @@ class MarkerResponse(BaseModel):
     label: Optional[str]
     description: Optional[str]
     location_detail: Optional[str]
-    latitude: Optional[float]
-    longitude: Optional[float]
     is_active: bool
     created_by_id: int
     created_at: datetime
@@ -59,6 +53,4 @@ class FaultFromMarkerCreate(BaseModel):
     severity: FaultSeverity = FaultSeverity.medium
     location: FaultLocation = FaultLocation.other
     location_detail: Optional[str] = None
-    fault_latitude: Optional[float] = None
-    fault_longitude: Optional[float] = None
     assigned_to_id: Optional[int] = None

@@ -1,34 +1,7 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
-
-async function parseResponse(response) {
-  const contentType = response.headers.get('content-type') || '';
-  const isJson = contentType.includes('application/json');
-  const payload = isJson ? await response.json() : await response.text();
-
-  if (!response.ok) {
-    const detail = typeof payload === 'object' && payload !== null
-      ? payload.detail || JSON.stringify(payload)
-      : payload || 'Request failed';
-    throw new Error(detail);
-  }
-
-  return payload;
-}
-
-function authHeaders(token) {
-  return {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${token}`,
-  };
-}
+import { API_BASE_URL, authHeaders, buildQuery, parseResponse } from './http';
 
 export async function listToolsRequest(token, filters = {}) {
-  const params = new URLSearchParams();
-  if (filters.owner_id !== undefined && filters.owner_id !== null && filters.owner_id !== '') {
-    params.set('owner_id', String(filters.owner_id));
-  }
-
-  const query = params.toString();
+  const query = buildQuery({ owner_id: filters.owner_id });
   const response = await fetch(`${API_BASE_URL}/api/tools${query ? `?${query}` : ''}`, {
     method: 'GET',
     headers: authHeaders(token),
@@ -64,7 +37,7 @@ export async function updateToolImageRequest(token, toolId, marker_image) {
 export async function deleteToolRequest(token, toolId) {
   const response = await fetch(`${API_BASE_URL}/api/tools/${toolId}`, {
     method: 'DELETE',
-    headers: authHeaders(token),
+    headers: authHeaders(token, false),
   });
 
   return parseResponse(response);
@@ -81,15 +54,10 @@ export async function logToolActionRequest(token, { tool_id, action }) {
 }
 
 export async function listToolSessionsRequest(token, filters = {}) {
-  const params = new URLSearchParams();
-  if (filters.technician_id !== undefined && filters.technician_id !== null && filters.technician_id !== '') {
-    params.set('technician_id', String(filters.technician_id));
-  }
-  if (filters.session_status) {
-    params.set('session_status', filters.session_status);
-  }
-
-  const query = params.toString();
+  const query = buildQuery({
+    technician_id: filters.technician_id,
+    session_status: filters.session_status,
+  });
   const response = await fetch(`${API_BASE_URL}/api/tools/sessions${query ? `?${query}` : ''}`, {
     method: 'GET',
     headers: authHeaders(token),

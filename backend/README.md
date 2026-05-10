@@ -308,8 +308,6 @@ Faults are the core data entity. They represent infrastructure problems found du
     "location": "tunnel",
     "location_detail": "Northern Line, Section B-4",
     "ar_marker_id": "MARKER-042",
-    "latitude": 51.509,
-    "longitude": -0.126,
     "reported_by_id": 3,
     "assigned_to_id": 5,
     "created_at": "2026-04-10T09:15:00Z",
@@ -339,8 +337,6 @@ Faults are the core data entity. They represent infrastructure problems found du
   "location": "platform",
   "location_detail": "Platform 2, South End",
   "ar_marker_id": "MARKER-017",
-  "latitude": 51.5074,
-  "longitude": -0.1278,
   "assigned_to_id": 4
 }
 ```
